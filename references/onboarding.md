@@ -171,7 +171,7 @@ Only ask when the user decides to build the corresponding room.
 - **Release pipeline** (`release.*`, opt-in — default off):
   > Which parts of release choreography do you want the CLI to help with? (You can pick none — this is all optional.)
   - `preflight`: the AI runs `keeper release preflight commit/push/build` before each irreversible step, catching debug residue / credential leaks / version drift / stale translations. (Recommended default — this is cheap insurance.)
-  - `changelog`: `keeper release changelog init/add/cut/show` maintains a `CHANGELOG.md` in Keep a Changelog format. (Recommended if you don't already have a changelog habit.)
+  - `changelog`: `keeper release changelog init/add/draft/cut/show` maintains a `CHANGELOG.md` in Keep a Changelog format. (Recommended if you don't already have a changelog habit.)
   - `autoVersion`: `keeper ver next` auto-computes the bump level from conventional commits; `keeper ver bump` (no arg) applies it. (Default on — turn off if you hand-pick every bump.)
   - `commitConvention`: "Should commits follow conventional commits (feat/fix/chore…)?" — defaults to `conventional` because that's what `ver next` parses; set `freeform` if the project already has its own style.
   - `platforms`: "Which platforms do you want setup guides + templates for?" (multi-select — `github` / `itch` / `steam`. Default none; pick what you actually plan to ship to.)

@@ -64,7 +64,7 @@ const MSG = {
     push     before \`git push\`   — all commit checks + tests / behind-remote / branch confirm / sync
     build    before packaging     — version bumped / translations / sprint accepted / clean tree / notes ready
 
-  changelog subs: init / add "<text>" / cut <X.Y.Z> / show
+  changelog subs: init / add "<text>" / draft [--apply] / cut <X.Y.Z> / show
   github subs:    release-notes / workflow-template / guide
   itch subs:      init / guide
   steam subs:     init / guide
@@ -85,7 +85,7 @@ const MSG = {
     push     \`git push\` 前——commit 全部检查 + 测试 / 是否落后 / 分支确认 / sync
     build    打包前——版本号 / 翻译 / sprint 验收 / 干净工作区 / release notes
 
-  changelog 子命令：init / add "<内容>" / cut <X.Y.Z> / show
+  changelog 子命令：init / add "<内容>" / draft [--apply] / cut <X.Y.Z> / show
   github 子命令：   release-notes / workflow-template / guide
   itch 子命令：     init / guide
   steam 子命令：    init / guide
@@ -96,7 +96,15 @@ const MSG = {
   },
   unknownCmd: { en: 'Unknown command "{0}", see release.js help', zh: '不认识命令"{0}"，看 release.js help' },
   preflightUsage: { en: 'Usage: release.js preflight <commit|push|build>', zh: '用法：release.js preflight <commit|push|build>' },
-  clUnknownSub: { en: 'Unknown changelog subcommand "{0}". Available: add / cut / show / init', zh: '不认识的 changelog 子命令"{0}"。有：add / cut / show / init' },
+  clUnknownSub: { en: 'Unknown changelog subcommand "{0}". Available: add / draft / cut / show / init', zh: '不认识的 changelog 子命令"{0}"。有：add / draft / cut / show / init' },
+    clDraftHead: { en: '\n  changelog draft (conventional commits since {0})\n', zh: '\n  changelog 草稿（自 {0} 以来的 conventional commits）\n' },
+    clDraftAll: { en: 'start of history', zh: '历史起点' },
+    clDraftNoGit: { en: '✗ not a git repo — cannot read commit history', zh: '✗ 不是 git 仓库——读不到提交历史' },
+    clDraftNoCommits: { en: '  nothing to draft — no commits since the last version tag', zh: '  没东西可起草——上次版本 tag 后没有 commit' },
+    clDraftNoEntries: { en: '  nothing chore-worthy — all commits since {0} are docs/test/chore noise', zh: '  没有值得写的——{0} 以来的 commit 全是 docs/test/chore 类噪声' },
+    clDraftSkipped: { en: '  ({0} docs/test/chore commit(s) skipped)', zh: '  （跳过 {0} 个 docs/test/chore 类 commit）' },
+    clDraftHint: { en: '\n  review, edit wording, then apply with --apply, or add lines one by one via `changelog add`', zh: '\n  人工审一遍、改好措辞，然后加 --apply 写入，或用 `changelog add` 逐条加' },
+    clDraftApplied: { en: '✓ CHANGELOG.md: {0} draft entr(y/ies) written into [Unreleased] — review and edit before cut', zh: '✓ CHANGELOG.md：{0} 条草稿已写进 [Unreleased]——cut 前记得人工过一遍' },
   clNoFile: { en: '✗ no CHANGELOG.md found (run `keeper release changelog init` first)', zh: '✗ 没找到 CHANGELOG.md（先跑 `keeper release changelog init`）' },
   clNoText: { en: '✗ no text provided · usage: keeper release changelog add "<text>"', zh: '✗ 没写内容 · 用法：keeper release changelog add "<内容>"' },
   clInitExists: { en: '✗ CHANGELOG.md already exists (use --force to overwrite)', zh: '✗ CHANGELOG.md 已存在（用 --force 覆盖）' },
@@ -108,7 +116,7 @@ const MSG = {
   clCutDone: { en: '✓ CHANGELOG.md: cut [Unreleased] → [{0}] · {1}', zh: '✓ CHANGELOG.md：[Unreleased] 切成 [{0}] · {1}' },
   clCutEmpty: { en: '  (Unreleased was empty — cut anyway, created a fresh Unreleased section)', zh: '  （Unreleased 是空的——照切，建了新的 Unreleased 段）' },
   clShowHead: { en: '\n  CHANGELOG.md\n', zh: '\n  CHANGELOG.md\n' },
-  clGenerateHint: { en: '\n  tip: to auto-fill [Unreleased] from git log, use a conventional-commits walker (planned: `keeper release changelog generate`)', zh: '\n  提示：要从 git log 自动填充 [Unreleased]，用 conventional commits 解析（计划中：`keeper release changelog generate`）' },
+  clGenerateHint: { en: '\n  tip: `keeper release changelog draft` auto-drafts [Unreleased] from conventional commits (--apply to write in)', zh: '\n  提示：`keeper release changelog draft` 能从 conventional commits 自动起草 [Unreleased]（加 --apply 写入）' },
 
   // ── preflight: shared ──
   preflightHead: { en: '\n  preflight · {0}\n', zh: '\n  preflight · {0}\n' },
@@ -265,7 +273,7 @@ const DEBUG_PATTERNS = [
   { re: /\bFIXME\b/, label: 'FIXME' },
 ];
 const SOURCE_EXTS = new Set(['.js', '.ts', '.jsx', '.tsx', '.py', '.mjs', '.cjs']);
-const TEST_PATTERNS = [/\.test\./, /\.spec\./, /__tests__\//, /\/tests?\//];
+const TEST_PATTERNS = [/\.test\./, /\.spec\./, /__tests__\//, /(^|\/)tests?\//];
 
 function scanDebugResidue(files) {
   const hits = [];
@@ -885,6 +893,7 @@ function cmdChangelog(args) {
   if (!sub) fail(t('clUnknownSub', '(none)'));
   if (sub === 'init') return clInit(args.slice(1));
   if (sub === 'add') return clAdd(args.slice(1));
+  if (sub === 'draft') return clDraft(args.slice(1));
   if (sub === 'cut') return clCut(args.slice(1));
   if (sub === 'show') return clShow(args.slice(1));
   fail(t('clUnknownSub', sub));
@@ -926,16 +935,113 @@ function clAdd(args) {
   console.log(t('clAdded', text));
 }
 
+// ── changelog draft (fb #5) ──
+// Turn `git log <tag>..HEAD` subjects into Keep-a-Changelog buckets. The
+// mapping is deliberately conservative: docs/style/test/chore/ci/build are
+// noise for a player-facing changelog and get skipped (counted, not listed).
+const DRAFT_BUCKETS = { feat: 'Added', fix: 'Fixed', perf: 'Changed', refactor: 'Changed', revert: 'Removed' };
+
+// Pure: parse log text (subjects separated per line) into draft buckets.
+// Returns { buckets: {Added:[...],Changed:[...],Fixed:[...],Removed:[...]}, skipped }.
+function draftFromLog(logText) {
+  const subjectRe = /^(feat|fix|perf|refactor|docs|style|test|chore|ci|build|revert)(\([^)]*\))?(!)?:\s*(.*)$/;
+  const buckets = { Added: [], Changed: [], Fixed: [], Removed: [] };
+  let skipped = 0;
+  for (const line of logText.split('\n')) {
+    const subject = line.trim();
+    if (!subject) continue;
+    const m = subjectRe.exec(subject);
+    if (!m) { skipped++; continue; } // non-conventional — human judgement needed, skip
+    const [, type, , bang, desc] = m;
+    const bucket = DRAFT_BUCKETS[type];
+    if (!bucket) { skipped++; continue; }
+    const text = (bang ? '**BREAKING** ' : '') + desc.trim();
+    buckets[bucket].push(text);
+  }
+  return { buckets, skipped };
+}
+
+// Pure: write draft buckets into the [Unreleased] section as "### <Bucket>"
+// groups. Returns { content, count } or null when Unreleased is missing.
+function applyDraft(content, buckets) {
+  // [ \t]*$ (not \s*$) — \s would swallow the newline and shift the insert point
+  const m = /^## \[Unreleased\][ \t]*$/m.exec(content);
+  if (!m) return null;
+  const sections = [];
+  let count = 0;
+  for (const name of ['Added', 'Changed', 'Fixed', 'Removed']) {
+    const items = buckets[name] || [];
+    if (!items.length) continue;
+    sections.push(`### ${name}\n` + items.map(it => `- ${it}`).join('\n'));
+    count += items.length;
+  }
+  if (!count) return { content, count: 0 };
+  const insertAt = m.index + m[0].length;
+  return { content: content.slice(0, insertAt) + '\n\n' + sections.join('\n\n') + content.slice(insertAt), count };
+}
+
+function clDraft(args) {
+  const apply = args.includes('--apply');
+  // reuse the same tag discovery convention as version-sync (vX.Y.Z, then X.Y.Z)
+  let tag = null;
+  let r = git(['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*']);
+  if (r.ok && r.out.trim()) tag = r.out.trim();
+  else {
+    r = git(['describe', '--tags', '--abbrev=0', '--match', '[0-9]*.[0-9]*.[0-9]*']);
+    if (r.ok && r.out.trim()) tag = r.out.trim();
+  }
+  const logR = git(['log', tag ? `${tag}..HEAD` : 'HEAD', '--format=%s']);
+  if (!logR.ok) { console.error(t('clDraftNoGit')); process.exit(1); }
+  const since = tag || t('clDraftAll');
+  console.log(t('clDraftHead', since));
+  if (!logR.out.trim()) { console.log(t('clDraftNoCommits')); return; }
+
+  const { buckets, skipped } = draftFromLog(logR.out);
+  const total = Object.values(buckets).reduce((n, a) => n + a.length, 0);
+  if (!total) { console.log(t('clDraftNoEntries', since)); return; }
+
+  for (const name of ['Added', 'Changed', 'Fixed', 'Removed']) {
+    if (!buckets[name].length) continue;
+    console.log(`  ### ${name}`);
+    for (const it of buckets[name]) console.log(`  - ${it}`);
+  }
+  if (skipped) console.log(t('clDraftSkipped', skipped));
+
+  if (!apply) { console.log(t('clDraftHint')); return; }
+
+  const p = changelogPath();
+  if (!fs.existsSync(p)) { console.error(t('clNoFile')); process.exit(1); }
+  const content = fs.readFileSync(p, 'utf8').replace(/\r\n?/g, '\n');
+  const res = applyDraft(content, buckets);
+  if (!res) { console.error(t('clAddedNoUnreleased')); process.exit(1); }
+  fs.writeFileSync(p, res.content);
+  console.log(t('clDraftApplied', res.count));
+}
+
 function clCut(args) {
   const version = args.find(a => !a.startsWith('--'));
   if (!version) { console.error(t('clCutNoVersion')); process.exit(1); }
   const p = changelogPath();
   if (!fs.existsSync(p)) { console.error(t('clNoFile')); process.exit(1); }
-  let content = fs.readFileSync(p, 'utf8').replace(/\r\n?/g, '\n');
+  const content = fs.readFileSync(p, 'utf8').replace(/\r\n?/g, '\n');
 
+  const today = new Date().toISOString().slice(0, 10);
+  const r = cutUnreleased(content, version, today);
+  if (!r) { console.error(t('clCutNoUnreleased')); process.exit(1); }
+
+  fs.writeFileSync(p, r.content);
+  console.log(t('clCutDone', version, today));
+  if (!r.hasBullets) console.log(t('clCutEmpty'));
+}
+
+// Pure core of `changelog cut`: turn "## [Unreleased]" into a dated version
+// heading and prepend a fresh Unreleased section. Returns null when there is
+// no Unreleased heading; hasBullets tells whether the cut section had entries.
+// Kept side-effect free so unit tests can cover it without touching the fs.
+function cutUnreleased(content, version, today) {
   const unreleasedRe = /^## \[Unreleased\]\s*$/m;
   const m = unreleasedRe.exec(content);
-  if (!m) { console.error(t('clCutNoUnreleased')); process.exit(1); }
+  if (!m) return null;
 
   // Check whether Unreleased has any content (bullets) between it and the next "## " heading
   const afterUnreleased = content.slice(m.index + m[0].length);
@@ -943,14 +1049,11 @@ function clCut(args) {
   const unreleasedBody = nextH2 >= 0 ? afterUnreleased.slice(0, nextH2) : afterUnreleased;
   const hasBullets = /^\s*-\s/m.test(unreleasedBody);
 
-  const today = new Date().toISOString().slice(0, 10);
   const newHeading = `## [${version}] - ${today}`;
   // Replace "## [Unreleased]" with the versioned heading, and prepend a fresh Unreleased section
   const freshUnreleased = '## [Unreleased]\n\n';
   const newContent = content.slice(0, m.index) + freshUnreleased + newHeading + content.slice(m.index + m[0].length);
-  fs.writeFileSync(p, newContent);
-  console.log(t('clCutDone', version, today));
-  if (!hasBullets) console.log(t('clCutEmpty'));
+  return { content: newContent, hasBullets };
 }
 
 function clShow(args) {
@@ -982,4 +1085,7 @@ function main() {
   table[cmd](rest);
 }
 
-main();
+// Run only when invoked directly; export pure/testable helpers for unit tests
+// (scripts/tests/unit.js) — same pattern as schedule.js.
+if (require.main === module) main();
+module.exports = { scanDebugResidue, scanCredentials, cutUnreleased, draftFromLog, applyDraft, DEBUG_PATTERNS, CRED_FILE_PATTERNS };

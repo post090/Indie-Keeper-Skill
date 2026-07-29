@@ -8,12 +8,12 @@
     "stampedAt": "2026-07-28 18:19"
   },
   "cli:zh": {
-    "srcHash": "aeda99b29eed",
-    "stampedAt": "2026-07-28 18:19"
+    "srcHash": "8dc848cfe4d2",
+    "stampedAt": "2026-07-29 09:32"
   },
   "onboarding:zh": {
-    "srcHash": "c9ef5c4ab892",
-    "stampedAt": "2026-07-28 18:19"
+    "srcHash": "d21031d08a88",
+    "stampedAt": "2026-07-29 09:32"
   },
   "game-docs-menu:zh": {
     "srcHash": "f5a605a7db31",
@@ -36,8 +36,8 @@
     "stampedAt": "2026-07-28 16:37"
   },
   "room-shipping:zh": {
-    "srcHash": "63edc034a9a1",
-    "stampedAt": "2026-07-28 18:19"
+    "srcHash": "ec5706702267",
+    "stampedAt": "2026-07-29 09:32"
   },
   "room-i18n:zh": {
     "srcHash": "fc79be643fce",

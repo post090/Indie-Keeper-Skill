@@ -404,4 +404,7 @@ function main() {
   table[cmd](rest);
 }
 
-main();
+// Run only when invoked directly; export pure helpers for unit tests
+// (scripts/tests/unit.js) — same pattern as schedule.js.
+if (require.main === module) main();
+module.exports = { parseConventionalCommits, compile, parseSemver, fmt, codeOf };

@@ -80,6 +80,7 @@ keeper ver bump minor    # 显式指定仍然可以
 ```bash
 keeper release changelog init                          # 创建 CHANGELOG.md（已存在会拒绝，--force 覆盖）
 keeper release changelog add "Added new feature X"     # 在 [Unreleased] 下追加一条
+keeper release changelog draft                         # 从上次 tag 后的 conventional commits 自动起草 [Unreleased]（加 --apply 写入）
 keeper release changelog cut 0.2.0                     # 把 [Unreleased] 切成 [0.2.0] - <今天>
 keeper release changelog show                          # 打印文件
 ```

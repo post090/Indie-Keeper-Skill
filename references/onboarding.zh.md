@@ -171,7 +171,7 @@ AI 首次在一个项目中启用 indie-keeper 时执行。问完把答案写成
 - **发布流水线**（`release.*`，可选——默认全关）：
   > 发版流程的哪些环节想让 CLI 帮忙？（可以一个都不选——全都是可选的。）
   - `preflight`：AI 在每个不可逆步骤前跑 `keeper release preflight commit/push/build`，拦下调试残留 / 凭证泄露 / 版本号漂移 / 翻译过期。（推荐默认开——便宜的保险。）
-  - `changelog`：`keeper release changelog init/add/cut/show` 维护一个 Keep a Changelog 格式的 `CHANGELOG.md`。（还没有 changelog 习惯的建议开。）
+  - `changelog`：`keeper release changelog init/add/draft/cut/show` 维护一个 Keep a Changelog 格式的 `CHANGELOG.md`。（还没有 changelog 习惯的建议开。）
   - `autoVersion`：`keeper ver next` 从 conventional commits 自动算升级级别；`keeper ver bump`（不带参数）直接应用。（默认开——每次都手挑级别的可以关。）
   - `commitConvention`："提交要不要按 conventional commits 来（feat/fix/chore…）？"——默认 `conventional`，因为 `ver next` 就是按它解析的；项目有自己的提交风格就设 `freeform`。
   - `platforms`："要装哪几个平台的配置指引 + 模板？"（多选——`github` / `itch` / `steam`。默认一个都不装，选你真打算发的。）

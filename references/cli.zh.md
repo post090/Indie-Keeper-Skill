@@ -76,6 +76,7 @@ keeper release preflight push    # git push 前跑（+ 测试 + 分支 + 落后�
 keeper release preflight build   # 打包构建前跑（+ 版本号 + 翻译 + sprint 验收）
 keeper release changelog init    # 创建 CHANGELOG.md（Keep a Changelog 格式）
 keeper release changelog add "Added X"   # 在 [Unreleased] 下追加一条
+keeper release changelog draft           # 从 conventional commits 自动起草 [Unreleased]（加 --apply 写入）
 keeper release changelog cut 0.2.0       # 把 [Unreleased] 切成 [0.2.0] - <今天>
 keeper release github guide      # GitHub release workflow 配置 + gh CLI 命令
 keeper release itch init         # 生成 itch.toml 模板

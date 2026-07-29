@@ -76,6 +76,7 @@ keeper release preflight push    # run before git push (+ tests + branch + behin
 keeper release preflight build   # run before packaging a build (+ version + translations + sprint)
 keeper release changelog init    # create CHANGELOG.md (Keep a Changelog format)
 keeper release changelog add "Added X"   # append a bullet under [Unreleased]
+keeper release changelog draft           # draft [Unreleased] from conventional commits (--apply to write in)
 keeper release changelog cut 0.2.0       # slice [Unreleased] → [0.2.0] - <today>
 keeper release github guide      # GitHub release workflow setup + gh CLI commands
 keeper release itch init         # generate itch.toml template

@@ -80,6 +80,7 @@ Logic: scans `git log <last-tag>..HEAD` for [conventional commits](https://www.c
 ```bash
 keeper release changelog init                          # create CHANGELOG.md (refuses if exists, --force to overwrite)
 keeper release changelog add "Added new feature X"     # append a bullet under [Unreleased]
+keeper release changelog draft                         # draft [Unreleased] from conventional commits since the last tag (--apply to write in)
 keeper release changelog cut 0.2.0                     # slice [Unreleased] → [0.2.0] - <today>
 keeper release changelog show                          # print the file
 ```

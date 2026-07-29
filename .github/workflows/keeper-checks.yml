@@ -58,5 +58,8 @@ jobs:
             echo "no schedule.json in this tree — skipped"
           fi
 
+      - name: Unit tests
+        run: node scripts/tests/unit.js
+
       - name: End-to-end exercise
         run: node scripts/tests/e2e.js
