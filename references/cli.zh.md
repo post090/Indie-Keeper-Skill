@@ -81,6 +81,11 @@ keeper release changelog cut 0.2.0       # 把 [Unreleased] 切成 [0.2.0] - <�
 keeper release github guide      # GitHub release workflow 配置 + gh CLI 命令
 keeper release itch init         # 生成 itch.toml 模板
 keeper release steam guide       # Steam 上传配置 + steamcmd 命令
+
+# 发货口·分支 —— 分支命名规范 + 保护分支守卫
+keeper branch check              # 当前分支对照规范体检（--strict 违规退出码 1）
+keeper branch new feature login ui   # 创建 feature/login-ui 并切过去
+keeper branch policy             # 打印当前生效的规范（keeper-profile.json → branch）
 ```
 
 每个命令都有 `help`：`keeper truth help`、`keeper fb help`……

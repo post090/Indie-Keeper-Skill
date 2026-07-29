@@ -13,6 +13,10 @@
     "layout": "single-public",
     "notes": "MIT open-source · code is the promotion · GitHub issue tracker is part of the Feedback Box"
   },
+  "branch": {
+    "protected": ["main", "master"],
+    "types": ["feature", "fix", "hotfix", "chore", "docs", "refactor", "experiment"]
+  },
   "rooms": {
     "archive": true,
     "feedback": true,
@@ -49,6 +53,7 @@
   "decidedBy": {
     "project.platforms": "user",
     "repo.layout": "user",
+    "branch.protected": "user",
     "review.mode": "default",
     "i18n.sourceLang": "user",
     "i18n.translator": "default"

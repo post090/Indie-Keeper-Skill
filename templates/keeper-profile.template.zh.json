@@ -14,6 +14,11 @@
     "layout": "single-private",
     "notes": "可选：single-private | single-public | dual（双仓时写清哪个是开发仓哪个是公开仓）"
   },
+  "branch": {
+    "_comment": "`keeper branch` 的分支规范——保护分支不做日常直改；新分支命名为 <类型>/<kebab-slug>",
+    "protected": ["main"],
+    "types": ["feature", "fix", "hotfix", "chore", "docs", "refactor", "experiment"]
+  },
   "rooms": {
     "archive": true,
     "feedback": true,

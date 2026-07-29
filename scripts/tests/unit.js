@@ -33,6 +33,7 @@ process.chdir(tmp);
 
 const vs = require('../commands/version-sync.js');
 const rel = require('../commands/release.js');
+const br = require('../commands/branch.js');
 
 console.log('\nindie-keeper unit tests\n');
 
@@ -185,6 +186,24 @@ console.log('\nindie-keeper unit tests\n');
   // draft → apply → cut roundtrip: the drafted entries survive a cut
   const cut = rel.cutUnreleased(a.content, '0.2.0', '2026-07-29');
   ok('draft entries survive changelog cut', !!cut && cut.hasBullets === true && cut.content.indexOf('## [0.2.0]') < cut.content.indexOf('- zoom controls'));
+})();
+
+// ── slugify / validateBranchName (branch policy, fb #6) ────
+(function suiteBranch() {
+  console.log('Suite 6 · slugify / validateBranchName (branch policy)');
+
+  ok('slugify kebab-cases words', br.slugify(['Login', 'UI', 'v2']) === 'login-ui-v2', br.slugify(['Login', 'UI', 'v2']));
+  ok('slugify squashes punctuation runs', br.slugify(['fix:', ' the -- thing!!']) === 'fix-the-thing');
+  ok('slugify keeps CJK', br.slugify(['登录', '界面']) === '登录-界面');
+  ok('slugify empty when nothing usable', br.slugify(['!!!', '---']) === '');
+
+  const policy = br.DEFAULT_POLICY;
+  ok('protected branch passes by definition', br.validateBranchName('main', policy).ok === true && br.validateBranchName('main', policy).protected === true);
+  ok('compliant name passes', br.validateBranchName('feature/login-ui', policy).ok === true);
+  ok('missing slash rejected', br.validateBranchName('quickfix', policy).reason === 'no-slash');
+  ok('unknown type rejected', br.validateBranchName('feat/login-ui', policy).reason === 'bad-type');
+  ok('uppercase/underscore slug rejected', br.validateBranchName('feature/Login_UI', policy).reason === 'bad-slug');
+  ok('trailing hyphen slug rejected', br.validateBranchName('fix/broken-', policy).reason === 'bad-slug');
 })();
 
 // ── summary ─────────────────────────────────────────────────

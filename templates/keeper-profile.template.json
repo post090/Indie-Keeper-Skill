@@ -14,6 +14,11 @@
     "layout": "single-private",
     "notes": "optional: single-private | single-public | dual (for dual, note which is the dev repo and which is the public one)"
   },
+  "branch": {
+    "_comment": "branch policy for `keeper branch` — protected branches take no day-to-day commits; new branches are named <type>/<kebab-slug>",
+    "protected": ["main"],
+    "types": ["feature", "fix", "hotfix", "chore", "docs", "refactor", "experiment"]
+  },
   "rooms": {
     "archive": true,
     "feedback": true,

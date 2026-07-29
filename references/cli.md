@@ -81,6 +81,11 @@ keeper release changelog cut 0.2.0       # slice [Unreleased] → [0.2.0] - <tod
 keeper release github guide      # GitHub release workflow setup + gh CLI commands
 keeper release itch init         # generate itch.toml template
 keeper release steam guide       # Steam upload setup + steamcmd commands
+
+# Shipping Dock · Branches —— naming policy + protected-branch guard
+keeper branch check              # current branch vs policy (--strict exits 1 on violations)
+keeper branch new feature login ui   # create feature/login-ui and switch to it
+keeper branch policy             # print the active policy (keeper-profile.json → branch)
 ```
 
 Every command has `help`: `keeper truth help`, `keeper fb help`…
