@@ -1,0 +1,56 @@
+{
+  "_comment": "indie-keeper project profile · the on-disk result of onboarding triage · every room's behavior reads this · field docs in references/onboarding.md",
+  "version": 1,
+  "createdAt": "2026-07-28",
+  "project": {
+    "name": "indie-keeper",
+    "platforms": ["github"]
+  },
+  "team": [
+    { "name": "user", "role": "product/code/release", "authority": ["*"] }
+  ],
+  "repo": {
+    "layout": "single-public",
+    "notes": "MIT open-source · code is the promotion · GitHub issue tracker is part of the Feedback Box"
+  },
+  "rooms": {
+    "archive": true,
+    "feedback": true,
+    "site": true,
+    "i18n": true,
+    "gametext": false,
+    "shipping": true,
+    "schedule": true
+  },
+  "startHere": {
+    "enabled": true
+  },
+  "entryDocs": {
+    "plan": true,
+    "progress": true,
+    "docsOverview": true,
+    "architecture": true,
+    "uiuxSpec": false
+  },
+  "versioning": {
+    "scheme": "zero-x",
+    "blockMajor": true
+  },
+  "sprint": { "rigor": "light" },
+  "review": {
+    "mode": "self",
+    "notes": "solo + AI fast iteration; AI self-verifies, user spot-checks subjectively"
+  },
+  "i18n": {
+    "sourceLang": "en",
+    "langs": ["zh"],
+    "translator": "ai-with-human-review"
+  },
+  "decidedBy": {
+    "project.platforms": "user",
+    "repo.layout": "user",
+    "review.mode": "default",
+    "i18n.sourceLang": "user",
+    "i18n.translator": "default"
+  }
+}

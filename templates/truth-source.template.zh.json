@@ -1,0 +1,14 @@
+{
+  "_comment": "唯一真相源登记表 · 每类信息只准有一个权威文件 · truth.js where/check 读这份 · 字段说明见 references/room-archive.md",
+  "version": 1,
+  "scanDir": "docs",
+  "topics": {
+    "守则": { "file": "AGENTS.md", "desc": "AI 协作守则（员工手册）" },
+    "玩法": { "file": "docs/design/game-design.md", "desc": "玩法总纲 · 核心循环", "aliases": ["game-design", "核心循环"] },
+    "角色": { "file": "docs/design/characters.md", "desc": "全部角色卡", "aliases": ["characters", "人设"], "authority": "（角色归谁拍板就写谁·没有则删本字段）" },
+    "路线图": { "file": "docs/ROADMAP.md", "desc": "版本分期计划", "aliases": ["roadmap", "计划"] },
+    "进度": { "file": "docs/PROGRESS.md", "desc": "历史施工日志", "aliases": ["progress", "日志"] },
+    "反馈": { "file": "docs/feedback", "desc": "意见箱（目录级登记）", "aliases": ["feedback", "意见"] },
+    "决策": { "file": "docs/decisions", "desc": "ADR 目录（目录级登记）", "aliases": ["adr"] }
+  }
+}

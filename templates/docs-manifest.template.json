@@ -1,0 +1,15 @@
+{
+  "_comment": "Document i18n manifest · source of truth for docs-i18n.js · fingerprint store docs-state.json is auto-generated in the same dir · see references/room-i18n.md",
+  "version": 1,
+  "sourceLang": "zh",
+  "primaryLang": "en",
+  "i18nDir": "i18n-docs",
+  "langs": ["zh", "en", "ja"],
+  "docs": [
+    { "id": "readme", "primary": "README.md", "source": "i18n-docs/README.zh.md", "desc": "project front page" },
+    { "id": "changelog", "primary": "CHANGELOG.md", "source": "i18n-docs/CHANGELOG.zh.md", "desc": "version changes / patch notes" }
+  ],
+  "skip": [
+    { "id": "license", "primary": "LICENSE", "reason": "legal text stays in its original language (open-source convention)" }
+  ]
+}

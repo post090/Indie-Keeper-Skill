@@ -1,0 +1,18 @@
+{
+  "_comment": "游戏文案部配置 · game-i18n.js 的真相源 · 指纹库 game-i18n-state.json 同目录自动生成 · 说明见 references/room-game-i18n.md",
+  "sourceLang": "zh",
+  "langs": ["zh", "en"],
+  "dictionary": {
+    "format": "json-per-lang",
+    "path": "assets/lang",
+    "_可选格式": "json-per-lang（每语言一个 JSON）/ json-single（单文件多语言段）/ csv（key,zh,en,… Godot 风格）· 引擎全托管（Ren'Py/Unreal）就删掉本字段，只用 scan 和 glossary"
+  },
+  "scan": {
+    "dirs": ["src"],
+    "exts": [".js"],
+    "translationMarks": ["t(", "tr("],
+    "skip": [],
+    "_说明": "dirs=扫哪些目录 · exts=什么后缀 · translationMarks=行里出现这些就算已走翻译函数 · skip=不该翻的路径前缀（日志/调试/开发工具）"
+  },
+  "glossary": "glossary.json"
+}

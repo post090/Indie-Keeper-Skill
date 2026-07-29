@@ -1,0 +1,28 @@
+{
+  "_comment": "Document i18n manifest · source of truth for docs-i18n.js · see the indie-keeper Docs Translation Desk manual",
+  "version": 1,
+  "sourceLang": "en",
+  "primaryLang": "en",
+  "i18nDir": "",
+  "langs": [
+    "en",
+    "zh"
+  ],
+  "docs": [
+    { "id": "readme",            "primary": "README.md",                       "source": "README.md",                       "desc": "project front page",                        "translations": { "zh": "docs/zh/README.zh.md" } },
+    { "id": "skill",             "primary": "SKILL.md",                        "source": "SKILL.md",                        "desc": "master document: AI onboarding, rooms, safety red lines", "translations": { "zh": "docs/zh/SKILL.zh.md" } },
+    { "id": "cli",               "primary": "references/cli.md",               "source": "references/cli.md",               "desc": "keeper CLI manual for humans" },
+    { "id": "onboarding",        "primary": "references/onboarding.md",        "source": "references/onboarding.md",        "desc": "onboarding triage manual" },
+    { "id": "game-docs-menu",    "primary": "references/game-docs-menu.md",    "source": "references/game-docs-menu.md",    "desc": "game design docs recommendation menu" },
+    { "id": "room-archive",      "primary": "references/room-archive.md",      "source": "references/room-archive.md",      "desc": "Archive room mechanism manual" },
+    { "id": "room-feedback",     "primary": "references/room-feedback.md",     "source": "references/room-feedback.md",     "desc": "Feedback Box room mechanism manual" },
+    { "id": "room-site",         "primary": "references/room-site.md",         "source": "references/room-site.md",         "desc": "WIKI room mechanism manual" },
+    { "id": "room-i18n",         "primary": "references/room-i18n.md",         "source": "references/room-i18n.md",         "desc": "Docs Translation Desk room mechanism manual" },
+    { "id": "room-game-i18n",    "primary": "references/room-game-i18n.md",    "source": "references/room-game-i18n.md",    "desc": "Game Text Desk room mechanism manual" },
+    { "id": "room-shipping",     "primary": "references/room-shipping.md",     "source": "references/room-shipping.md",     "desc": "Shipping Dock room mechanism manual" },
+    { "id": "room-schedule",     "primary": "references/room-schedule.md",     "source": "references/room-schedule.md",     "desc": "Schedule room mechanism manual (version dates + Gantt)" }
+  ],
+  "skip": [
+    { "id": "license", "primary": "LICENSE", "reason": "legal text stays in its original language (open-source convention)" }
+  ]
+}

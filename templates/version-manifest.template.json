@@ -1,0 +1,10 @@
+{
+  "_comment": "Version-number location registry · source of truth for version-sync.js · {{version}}=X.Y.Z · {{code}}=major*10000+minor*100+patch · see references/room-shipping.md",
+  "version": 1,
+  "blockMajor": true,
+  "targets": [
+    { "file": "package.json", "patterns": ["\"version\": \"{{version}}\""] },
+    { "file": "VERSION", "patterns": ["{{version}}"], "_note": "example of a pure-version-number file · delete if you don't have one" },
+    { "file": "android/app/build.gradle", "patterns": ["versionName \"{{version}}\"", "versionCode {{code}}"], "_note": "example for Android projects · delete if you don't have one" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "_comment": "Glossary · this game's homebrew dictionary · shared across the project (both the Game Text Desk and the Docs Translation Desk read it) · see references/room-game-i18n.md",
+  "_rules": "The language-code field = the single canonical name in that language · meaning explains what it is via analogy · the AI checks this before writing any player-facing text",
+  "terms": [
+    {
+      "zh": "灵魂",
+      "meaning": "action resource, consumed when attacking (similar to other games' stamina/endurance)",
+      "en": "Soul",
+      "note": "worldbuilding: characters are driven by Soul, deliberately avoiding the generic term — example entry, replace with your game's jargon"
+    },
+    {
+      "zh": "回廊",
+      "meaning": "the unit of one game flow (similar to other games' level/round)",
+      "en": "Corridor",
+      "note": "example entry"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "_comment": "Game Text Desk config · source of truth for game-i18n.js · fingerprint store game-i18n-state.json is auto-generated in the same dir · see references/room-game-i18n.md",
+  "sourceLang": "zh",
+  "langs": ["zh", "en"],
+  "dictionary": {
+    "format": "json-per-lang",
+    "path": "assets/lang",
+    "_formats": "json-per-lang (one JSON per language) / json-single (single file with language sections) / csv (key,zh,en,… Godot-style) · if your engine manages everything (Ren'Py/Unreal), delete this field and just use scan and glossary"
+  },
+  "scan": {
+    "dirs": ["src"],
+    "exts": [".js"],
+    "translationMarks": ["t(", "tr("],
+    "skip": [],
+    "_notes": "dirs = which directories to scan · exts = which extensions · translationMarks = if a line contains these, it counts as already going through a translation function · skip = path prefixes that should not be scanned (logs/debug/dev tools)"
+  },
+  "glossary": "glossary.json"
+}

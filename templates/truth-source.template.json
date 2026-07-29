@@ -1,0 +1,14 @@
+{
+  "_comment": "Single source of truth registry · each kind of info has exactly one authoritative file · truth.js where/check reads this · field docs in references/room-archive.md",
+  "version": 1,
+  "scanDir": "docs",
+  "topics": {
+    "rules": { "file": "AGENTS.md", "desc": "AI collaboration rules (employee handbook)" },
+    "gameplay": { "file": "docs/design/game-design.md", "desc": "Game design overview · core loop", "aliases": ["game-design", "core-loop"] },
+    "characters": { "file": "docs/design/characters.md", "desc": "All character cards", "aliases": ["chars"], "authority": "(write whoever has final say on characters · remove this field if none)" },
+    "roadmap": { "file": "docs/ROADMAP.md", "desc": "Version-by-version plan", "aliases": ["plan"] },
+    "progress": { "file": "docs/PROGRESS.md", "desc": "Historical construction log", "aliases": ["log"] },
+    "feedback": { "file": "docs/feedback", "desc": "Feedback box (directory-level registration)", "aliases": ["inbox"] },
+    "decisions": { "file": "docs/decisions", "desc": "ADR directory (directory-level registration)", "aliases": ["adr"] }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "_comment": "indie-keeper 项目档案 · 入驻问诊的落盘产物 · 所有房间的行为都查这份 · 字段说明见 references/onboarding.md",
+  "version": 1,
+  "createdAt": "YYYY-MM-DD",
+  "project": {
+    "name": "游戏名",
+    "platforms": ["itch", "steam", "android", "web"]
+  },
+  "team": [
+    { "name": "某人", "role": "代码/发版", "authority": [] },
+    { "name": "某人", "role": "世界观/美术", "authority": ["设定", "美术"] }
+  ],
+  "repo": {
+    "layout": "single-private",
+    "notes": "可选：single-private | single-public | dual（双仓时写清哪个是开发仓哪个是公开仓）"
+  },
+  "rooms": {
+    "archive": true,
+    "feedback": true,
+    "site": false,
+    "i18n": false,
+    "gametext": false,
+    "shipping": true,
+    "schedule": false
+  },
+  "startHere": {
+    "enabled": true
+  },
+  "entryDocs": {
+    "plan": true,
+    "progress": true,
+    "docsOverview": true,
+    "architecture": true,
+    "uiuxSpec": true
+  },
+  "versioning": {
+    "scheme": "zero-x",
+    "blockMajor": true
+  },
+  "sprint": { "rigor": "light" },
+  "review": {
+    "mode": "mixed",
+    "notes": "mixed 时写清界线，如：玩法/美术类 human，其余 self"
+  },
+  "i18n": {
+    "sourceLang": "zh",
+    "langs": ["en"],
+    "translator": "ai-with-human-review"
+  },
+  "decidedBy": {
+    "repo.layout": "default",
+    "review.mode": "default"
+  }
+}

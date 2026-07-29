@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Temp test dirs (keeper scripts create .tmp-* during acceptance runs)
+.tmp-*
+.tmp*/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

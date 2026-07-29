@@ -1,0 +1,54 @@
+{
+  "_comment": "indie-keeper project profile · the on-disk result of onboarding triage · every room's behavior reads this · field docs in references/onboarding.md",
+  "version": 1,
+  "createdAt": "YYYY-MM-DD",
+  "project": {
+    "name": "game name",
+    "platforms": ["itch", "steam", "android", "web"]
+  },
+  "team": [
+    { "name": "someone", "role": "code/release", "authority": [] },
+    { "name": "someone", "role": "worldbuilding/art", "authority": ["setting", "art"] }
+  ],
+  "repo": {
+    "layout": "single-private",
+    "notes": "optional: single-private | single-public | dual (for dual, note which is the dev repo and which is the public one)"
+  },
+  "rooms": {
+    "archive": true,
+    "feedback": true,
+    "site": false,
+    "i18n": false,
+    "gametext": false,
+    "shipping": true,
+    "schedule": false
+  },
+  "startHere": {
+    "enabled": true
+  },
+  "entryDocs": {
+    "plan": true,
+    "progress": true,
+    "docsOverview": true,
+    "architecture": true,
+    "uiuxSpec": true
+  },
+  "versioning": {
+    "scheme": "zero-x",
+    "blockMajor": true
+  },
+  "sprint": { "rigor": "light" },
+  "review": {
+    "mode": "mixed",
+    "notes": "for mixed, write the boundary, e.g.: gameplay/art = human, rest = self"
+  },
+  "i18n": {
+    "sourceLang": "zh",
+    "langs": ["en"],
+    "translator": "ai-with-human-review"
+  },
+  "decidedBy": {
+    "repo.layout": "default",
+    "review.mode": "default"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "readme:zh": {
+    "srcHash": "effb159d8a4e",
+    "stampedAt": "2026-07-29 08:42"
+  },
+  "skill:zh": {
+    "srcHash": "8e313cf3a117",
+    "stampedAt": "2026-07-28 18:19"
+  },
+  "cli:zh": {
+    "srcHash": "aeda99b29eed",
+    "stampedAt": "2026-07-28 18:19"
+  },
+  "onboarding:zh": {
+    "srcHash": "c9ef5c4ab892",
+    "stampedAt": "2026-07-28 18:19"
+  },
+  "game-docs-menu:zh": {
+    "srcHash": "f5a605a7db31",
+    "stampedAt": "2026-07-28 11:42"
+  },
+  "room-archive:zh": {
+    "srcHash": "8569af95a544",
+    "stampedAt": "2026-07-28 11:25"
+  },
+  "room-feedback:zh": {
+    "srcHash": "976f4c108c77",
+    "stampedAt": "2026-07-28 10:55"
+  },
+  "room-site:zh": {
+    "srcHash": "4ae99eca5114",
+    "stampedAt": "2026-07-28 16:37"
+  },
+  "room-game-i18n:zh": {
+    "srcHash": "d16fd84592d0",
+    "stampedAt": "2026-07-28 16:37"
+  },
+  "room-shipping:zh": {
+    "srcHash": "63edc034a9a1",
+    "stampedAt": "2026-07-28 18:19"
+  },
+  "room-i18n:zh": {
+    "srcHash": "fc79be643fce",
+    "stampedAt": "2026-07-28 10:57"
+  },
+  "room-schedule:zh": {
+    "srcHash": "a458295d41a7",
+    "stampedAt": "2026-07-28 17:28"
+  }
+}

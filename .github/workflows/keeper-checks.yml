@@ -1,0 +1,62 @@
+name: keeper-checks
+
+# Runs indie-keeper's own health checks on every push and PR.
+# indie-keeper is zero-dependency Node + docs — nothing to compile or build.
+# These checks catch the regressions the audit found:
+#   - script syntax errors (node --check)
+#   - truth-source dead links / untracked docs (keeper truth check)
+#   - stale translations / manifest drift (keeper docs status)
+#   - schedule.json consistency (keeper schedule check)
+# If any check exits non-zero, the workflow fails and blocks the PR.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Script syntax (node --check)
+        run: |
+          # No node_modules — zero deps. Check every .js under scripts/.
+          fail=0
+          while IFS= read -r f; do
+            if ! node --check "$f"; then
+              fail=1
+            fi
+          done < <(find scripts -name '*.js' -type f)
+          exit $fail
+
+      - name: Archive checkup (truth check)
+        # truth-source.json lives in the internal working tree only —
+        # the public snapshot ships without it, so skip when absent.
+        run: |
+          if [ -f docs/truth-source.json ] || [ -f truth-source.json ]; then
+            node scripts/keeper.js truth check
+          else
+            echo "no truth-source.json in this tree — skipped"
+          fi
+
+      - name: Docs i18n status (translation sync)
+        run: node scripts/keeper.js docs status
+
+      - name: Schedule consistency
+        # schedule.json is internal state — skip when absent (public snapshot).
+        run: |
+          if [ -f docs/schedule.json ] || [ -f schedule.json ]; then
+            node scripts/keeper.js schedule check
+          else
+            echo "no schedule.json in this tree — skipped"
+          fi
+
+      - name: End-to-end exercise
+        run: node scripts/tests/e2e.js

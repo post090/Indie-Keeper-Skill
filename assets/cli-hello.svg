@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 754" font-family="ui-monospace,Consolas,'Cascadia Mono',Menlo,monospace" font-size="15">
+<style>.t{fill:#c6d2df}.p{fill:#7aa3d4;font-weight:bold}.ti{fill:#68798d;font-size:13px}</style>
+<rect width="100%" height="100%" fill="#1a2332"/>
+<g transform="translate(40,40)">
+<rect width="780" height="674" rx="12" fill="#0d141f"/>
+<path d="M0 12a12 12 0 0 1 12-12h756a12 12 0 0 1 12 12v26H0z" fill="#151f2d"/>
+<circle cx="24" cy="19" r="6" fill="#ff5f57"/><circle cx="44" cy="19" r="6" fill="#febc2e"/><circle cx="64" cy="19" r="6" fill="#28c840"/>
+<text x="84" y="24" class="ti">keeper hello</text>
+<text x="34" y="92" xml:space="preserve" class="p">$ keeper hello</text>
+<text x="34" y="116" xml:space="preserve" class="t"></text>
+<text x="34" y="140" xml:space="preserve" class="t">      .-----.</text>
+<text x="34" y="164" xml:space="preserve" class="t">      | o o |          .--.</text>
+<text x="34" y="188" xml:space="preserve" class="t">      |  v  |         /    \</text>
+<text x="34" y="212" xml:space="preserve" class="t">    .---------.      /______\</text>
+<text x="34" y="236" xml:space="preserve" class="t">    |   ###   |--E   | |  | |</text>
+<text x="34" y="260" xml:space="preserve" class="t">    '---------'      | |__| |</text>
+<text x="34" y="284" xml:space="preserve" class="t">      _|   |_        |______|</text>
+<text x="34" y="308" xml:space="preserve" class="t"></text>
+<text x="34" y="332" xml:space="preserve" class="t">      indie-keeper</text>
+<text x="34" y="356" xml:space="preserve" class="t"></text>
+<text x="34" y="380" xml:space="preserve" class="t">  还不是 git 仓库（想留历史就 git init）</text>
+<text x="34" y="404" xml:space="preserve" class="t"></text>
+<text x="34" y="428" xml:space="preserve" class="t">  ▸ 没有进行中的 sprint（keeper sprint new "&lt;标题&gt;" 起一个）</text>
+<text x="34" y="452" xml:space="preserve" class="t">  ▸ 还没有真相源登记表（keeper truth init 生成）</text>
+<text x="34" y="476" xml:space="preserve" class="t"></text>
+<text x="34" y="500" xml:space="preserve" class="t">  常用命令：</text>
+<text x="34" y="524" xml:space="preserve" class="t">    keeper where &lt;主题&gt;       这个设定写在哪个文件？</text>
+<text x="34" y="548" xml:space="preserve" class="t">    keeper fb add "&lt;内容&gt;"    随手记一条反馈</text>
+<text x="34" y="572" xml:space="preserve" class="t">    keeper site serve         本地逛 WIKI</text>
+<text x="34" y="596" xml:space="preserve" class="t">    keeper sprint show        当前 sprint 详情</text>
+<text x="34" y="620" xml:space="preserve" class="t">    keeper help               看全部命令</text>
+</g></svg>

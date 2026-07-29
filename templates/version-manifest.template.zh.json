@@ -1,0 +1,10 @@
+{
+  "_comment": "版本号位置登记表 · version-sync.js 的真相源 · {{version}}=X.Y.Z · {{code}}=major*10000+minor*100+patch · 说明见 references/room-shipping.md",
+  "version": 1,
+  "blockMajor": true,
+  "targets": [
+    { "file": "package.json", "patterns": ["\"version\": \"{{version}}\""] },
+    { "file": "VERSION", "patterns": ["{{version}}"], "_note": "纯版本号文件的例子·没有就删" },
+    { "file": "android/app/build.gradle", "patterns": ["versionName \"{{version}}\"", "versionCode {{code}}"], "_note": "安卓项目的例子·没有就删" }
+  ]
+}

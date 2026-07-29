@@ -1,0 +1,63 @@
+{
+  "_comment": "Version schedule + effort estimates · source of truth for schedule.js · the Gantt view in the WIKI renders this · keep ROADMAP.md as the human narrative (themes/goals), this file holds the structured dates + dependencies",
+  "version": 1,
+  "versions": [
+    {
+      "id": "v0.1",
+      "title": "example version",
+      "status": "planned",
+      "milestone": "2026-08-31",
+      "_note_milestone": "the version's target release date · rendered as a diamond marker + vertical line in the Gantt · omit if the version has no fixed date",
+      "items": [
+        {
+          "id": "0.1.1",
+          "title": "example task",
+          "estimate": 2,
+          "start": "2026-08-01",
+          "due": "2026-08-02",
+          "dependsOn": [],
+          "status": "todo",
+          "confidence": "high",
+          "_note_estimate": "estimated effort in working days · not calendar days · solo devs: be honest, pad for unknowns",
+          "_note_dependsOn": "item ids that must finish before this can start · empty array = no deps",
+          "_note_status": "todo | doing | done | blocked | dropped",
+          "_note_confidence": "high = sure of the estimate · low = wild guess, will likely slip · Gantt renders low-confidence bars with a dashed outline"
+        },
+        {
+          "id": "0.1.2",
+          "title": "follow-up task depending on the first",
+          "estimate": 3,
+          "start": "2026-08-03",
+          "due": "2026-08-05",
+          "dependsOn": ["0.1.1"],
+          "status": "todo",
+          "confidence": "low"
+        }
+      ]
+    },
+    {
+      "id": "v0.2",
+      "title": "version without a fixed date",
+      "status": "planned",
+      "_note_no_milestone": "no milestone field · Gantt shows it as an open-ended group, bars laid out by sequence not calendar",
+      "items": [
+        {
+          "id": "0.2.1",
+          "title": "sequential task (no dates, order inferred from dependsOn)",
+          "estimate": 1,
+          "dependsOn": [],
+          "status": "todo",
+          "confidence": "high"
+        }
+      ]
+    }
+  ],
+  "_legend": {
+    "version.status": "planned | in-progress | shipped | paused",
+    "item.status": "todo | doing | done | blocked | dropped",
+    "confidence": "high | low",
+    "estimate": "working days (not calendar days)",
+    "dependsOn": "item ids (same-version or cross-version)",
+    "milestone": "ISO date (YYYY-MM-DD) or omitted"
+  }
+}

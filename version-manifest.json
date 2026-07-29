@@ -1,0 +1,6 @@
+{
+  "targets": [
+    { "file": "docs/ROADMAP.md", "patterns": ["> 当前版本：v{{version}}"] }
+  ],
+  "blockMajor": true
+}
