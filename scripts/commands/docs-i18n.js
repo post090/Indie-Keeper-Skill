@@ -21,7 +21,7 @@
 //
 // Manifest: docs-manifest.json (auto-discovered in root / locales/ / .docs/, or --manifest)
 // Fingerprints: docs-state.json (next to the manifest, auto-generated, committed to git)
-// All commands accept --root=<project root> and --lang-ui via --lang=<en|zh>
+// All commands accept --root=<project root> and --ui-lang=<en|zh>
 'use strict';
 
 const fs = require('fs');
@@ -53,10 +53,10 @@ const A = parseArgv(process.argv.slice(2));
 function flag(name, dflt) { return name in A.flags ? A.flags[name] : dflt; }
 
 const ROOT = path.resolve(flag('root', process.cwd()));
-const CANDIDATES = ['docs-manifest.json', 'docs/docs-manifest.json', 'locales/docs-manifest.json', '.docs/docs-manifest.json'];
+const CANDIDATES = require('../project-files').docs;
 
 // UI language: --ui-lang wins here because --lang means "target language"
-const uiLang = flag('ui-lang', '') ? (/^zh/i.test(flag('ui-lang', '')) ? 'zh' : 'en') : detectLang(['--none']);
+const uiLang = flag('ui-lang', '') ? (/^zh/i.test(flag('ui-lang', '')) ? 'zh' : 'en') : detectLang([], flag('root', ''));
 
 const MSG = {
   manifestMissing: { en: 'Manifest not found: {0}', zh: '清单不存在：{0}' },
@@ -98,7 +98,7 @@ const MSG = {
   todoBlocked: { en: '  ⛔ {0}: [TODO] markers remain — refusing to stamp unfinished work (--force to override)', zh: '  ⛔ {0}：还有 [TODO] 残留，没翻完不给记指纹（真要记用 --force）' },
   alreadyFresh: { en: '  = {0}: already fresh · skipped', zh: '  = {0}：已经同步 · 跳过' },
   stampedOne: { en: '  ✓ {0}: stamped {1}', zh: '  ✓ {0}：已记指纹 {1}' },
-  checkProblems: { en: '\n  {0} problem(s) found (stale / unstamped / unfinished)\n', zh: '\n  发现 {0} 处问题（过期/没记指纹/没翻完）\n' },
+  checkProblems: { en: '\n  {0} problem(s) found (missing / stale / unstamped / unfinished)\n', zh: '\n  发现 {0} 处问题（缺失/过期/没记指纹/没翻完）\n' },
   checkAllFresh: { en: '\n  ✓ everything fresh\n', zh: '\n  ✓ 全部同步\n' },
   stampSummary: { en: '\n  ✓ stamped {0} · skipped {1}{2}{3}\n', zh: '\n  ✓ 记了 {0} 份指纹 · 跳过 {1}{2}{3}\n' },
   stampBlockedPart: { en: ' · blocked {0} unfinished', zh: ' · 拦下没翻完的 {0}' },
@@ -326,8 +326,15 @@ function cmdStamp(args) {
   const all = A.bools.has('all');
   const check = A.bools.has('check');
   const force = A.bools.has('force');
-  const docArg = args[0] || '';
-  const langArg = args[1] || '';
+  const docArg = all ? '' : (args[0] || '');
+  const positionalLang = args[all ? 0 : 1];
+  const langArg = positionalLang || flag('lang', '');
+  if (args.length > (all ? 1 : 2) || (positionalLang && flag('lang') && positionalLang !== flag('lang'))) {
+    fail(t('stampUsage'));
+  }
+  if (langArg && !manifest.langs.includes(langArg)) {
+    fail(t('langNotListed', langArg, manifest.langs.join(', ')));
+  }
 
   if (!all && !docArg) fail(t('stampUsage'));
 
@@ -343,7 +350,11 @@ function cmdStamp(args) {
 
   for (const doc of docs) {
     const srcPath = path.join(ROOT, doc.source);
-    if (!fs.existsSync(srcPath)) { log.push(t('stampNoSource', doc.id, doc.source)); continue; }
+    if (!fs.existsSync(srcPath)) {
+      missing++;
+      log.push(t('stampNoSource', doc.id, doc.source));
+      continue;
+    }
     const srcHash = hashContent(fs.readFileSync(srcPath, 'utf8'));
     const langs = langArg ? [langArg] : manifest.langs.filter(l => l !== manifest.sourceLang);
 
@@ -354,7 +365,7 @@ function cmdStamp(args) {
       const key = `${doc.id}:${lang}`;
 
       if (!fs.existsSync(tp)) {
-        if (langArg) { missing++; log.push(t('stampNoTrans', rel)); }
+        if (check || langArg) { missing++; log.push(t('stampNoTrans', rel)); }
         continue;
       }
       const content = fs.readFileSync(tp, 'utf8');
@@ -386,7 +397,7 @@ function cmdStamp(args) {
 
   if (log.length) console.log('\n' + log.join('\n'));
   if (check) {
-    if (problems > 0) { console.log(t('checkProblems', problems)); process.exit(1); }
+    if (problems + missing > 0) { console.log(t('checkProblems', problems + missing)); process.exit(1); }
     console.log(t('checkAllFresh'));
     return;
   }

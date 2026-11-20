@@ -49,7 +49,7 @@ One safeguard: if `[TODO` markers remain in the translation, `stamp` refuses to 
 
 ### CI gate
 
-`stamp --all --check`: read-only, exits 1 if anything is stale / unstamped / has TODO. Attached to step 3 of the release flow, guaranteeing no stale translations ship.
+`stamp --all --check`: read-only, exits 1 for missing sources or translations, stale or unstamped translations, or unfinished TODO markers. Attached to step 3 of the release flow, guaranteeing no stale translations ship.
 
 ## Room build flow
 

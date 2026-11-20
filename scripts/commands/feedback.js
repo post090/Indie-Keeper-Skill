@@ -88,6 +88,7 @@ const MSG = {
   initExists: { en: '{0} already exists (--force to overwrite)', zh: '{0} 已存在（--force 覆盖）' },
   initComment: { en: 'Feedback Box source of truth · maintained by feedback.js · never hand-edit', zh: '意见箱真相源 · feedback.js 维护 · 勿手改' },
   initDone: { en: '✓ initialized {0} + INBOX.md', zh: '✓ 已初始化 {0} + INBOX.md' },
+  idExhausted: { en: 'No safe numeric feedback ID available', zh: '反馈编号已超过可安全保存的整数范围' },
   addUsage: { en: 'Usage: feedback.js add "<text>" [--from someone] [--tag bug]', zh: '用法：feedback.js add "<内容>" [--from 某人] [--tag bug]' },
   badTag: { en: 'Unknown tag "{0}" (available: {1})', zh: '未知标签"{0}"（可用：{1}）' },
   badStatus: { en: 'Unknown status "{0}"', zh: '未知状态"{0}"' },
@@ -186,6 +187,15 @@ function findItem(store, id) {
 
 // ── INBOX.md generation ──
 
+// Stored links use project paths; the Markdown page may live several folders below ROOT.
+function inboxHref(href, dir) {
+  if (!href || /^(?:[a-z][\w+.-]*:|[/?#]|\.{1,2}[\\/])/i.test(href)) return href;
+  const [, file, suffix] = /^([^?#]+)(.*)$/.exec(href);
+  const target = path.resolve(ROOT, file.replace(/\\/g, '/'));
+  if (!fs.existsSync(target) && fs.existsSync(path.resolve(dir, file))) return href;
+  return path.relative(dir, target).split(path.sep).join('/').replace(/ /g, '%20') + suffix;
+}
+
 function regenInbox(store) {
   const inboxPath = path.join(path.dirname(store._path), 'INBOX.md');
   const groups = {};
@@ -212,7 +222,7 @@ function regenInbox(store) {
     lines.push('|---|---|---|---|---|');
     for (const it of arr) {
       const tag = tLabel(it.tag);
-      const links = (it.links || []).map(l => `[${l.label}](${l.href})`).join(' · ');
+      const links = (it.links || []).map(l => `[${l.label}](${inboxHref(l.href, path.dirname(inboxPath))})`).join(' · ');
       const result = it.result
         ? [it.result.version, (it.result.commits || []).map(h => '`' + h + '`').join(','), it.result.summary].filter(Boolean).join(' · ')
         : (it.note || '');
@@ -244,8 +254,16 @@ function cmdAdd(args) {
   const text = args.join(' ');
   if (!text) fail(t('addUsage'));
   const store = load();
+  // Keep IDs unique when importing a legacy store with a missing or stale counter.
+  let nextId = Number.isSafeInteger(store.nextId) ? Math.max(1, store.nextId) : 1;
+  for (const existing of store.items) {
+    const id = Number(existing.id);
+    if (Number.isSafeInteger(id) && id >= nextId) nextId = id + 1;
+  }
+  if (!Number.isSafeInteger(nextId + 1)) fail(t('idExhausted'));
+  store.nextId = nextId + 1;
   const item = {
-    id: store.nextId++,
+    id: nextId,
     text,
     from: flag('from', '?'),
     tag: flag('tag', 'other'),

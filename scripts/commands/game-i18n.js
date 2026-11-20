@@ -60,7 +60,7 @@ function fail(msg) { console.error(`✗ ${msg}`); process.exit(1); }
 function hash(s) { return crypto.createHash('sha1').update(String(s), 'utf8').digest('hex').slice(0, 12); }
 
 // UI language: --ui-lang wins because --lang means "target language" here
-const uiLang = flag('ui-lang', '') ? (/^zh/i.test(flag('ui-lang', '')) ? 'zh' : 'en') : detectLang(['--none']);
+const uiLang = flag('ui-lang', '') ? (/^zh/i.test(flag('ui-lang', '')) ? 'zh' : 'en') : detectLang([], flag('root', ''));
 
 const MSG = {
   noManifest: { en: 'game-i18n-manifest.json not found. Run game-i18n.js init to generate a draft.', zh: '没找到 game-i18n-manifest.json。先跑 game-i18n.js init 生成草稿。' },

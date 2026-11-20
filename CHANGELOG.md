@@ -5,8 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follo
 
 ## [Unreleased]
 
-<!-- Add new entries here as you ship. Use `keeper release changelog add "<text>"` to append. -->
-<!-- Categories: Added / Changed / Deprecated / Removed / Fixed / Security -->
+## [0.2.0] - 2026-11-20
+
+### Added
+
+- Formal Sprint acceptance links named test cases to a tested Git commit, a run report and checksummed artifacts. Small tasks can still use self-checks.
+- `keeper hello` can display the next task, its rationale, the decision source and the evidence location. Interactive help adapts to narrow terminals and leaves CI, JSON and redirected output free of artwork.
+- `keeper branch` checks branch names and protected branches. `keeper release changelog draft` prepares release notes from conventional commits.
+
+### Fixed
+
+- Version commands read the current version from the root `VERSION` file and validate all registered targets before applying an update.
+- Commands consistently honor the selected project root. Section edits can distinguish repeated Markdown headings, and translation checks detect missing files.
+- Release preflight checks staged JavaScript and runs the selected project's declared test command.
 
 ## [0.1.0] - 2026-07-29
 

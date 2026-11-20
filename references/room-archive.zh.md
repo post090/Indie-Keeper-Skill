@@ -36,7 +36,7 @@ node truth.js update ROADMAP.md --section "v0.5" --content "..."
 node truth.js update PROGRESS.md --section "日志" --append --content "..."
 ```
 
-按 markdown 标题切块（代码块里的 # 不算标题），只动目标章节，其余原样保留。找不到章节时列出全部章节名帮助纠错。
+按 markdown 标题切块（代码块里的 # 不算标题），只动目标章节，其余原样保留。找不到章节时会列出标题。若多个章节匹配，使用完整标题并加 `--parent "上级标题"` 限定范围。仍有歧义时退出，文件保持原样。
 
 ### 体检（check）
 

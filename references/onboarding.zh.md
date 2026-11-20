@@ -243,7 +243,7 @@ AI 首次在一个项目中启用 indie-keeper 时执行。问完把答案写成
 └── scripts/             ← keeper CLI + 房间脚本
     ├── keeper.js        ← CLI 入口
     ├── lang.js          ← 共享 i18n 助手
-    ├── lib/             ← 共享库
+    ├── project-files.js ← 入口和房间命令共用的登记表路径
     ├── commands/        ← 一文件一房间（truth/feedback/docs-site/…）
     └── tests/           ← 测试脚本（见下面的测试规范）
 ```

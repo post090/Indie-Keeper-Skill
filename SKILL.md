@@ -45,9 +45,9 @@ Every time this Skill is activated in a project:
    - **Furnish from scratch**: project has no doc structure yet → build only the rooms the user asked for, per triage results.
    - **Renovate**: project already has docs/, README, AGENTS.md, etc. → **inventory first**, register existing docs into the source of truth, fill only the gaps, never bulldoze.
 3. **How it lands** (confirmed at triage):
-   - Copy the zero-dependency Node scripts from `scripts/` into the target project (suggested `tools/keeper/`), register `"keeper": "node tools/keeper/keeper.js"` in package.json — then the whole project has one door: `keeper hello` for shift handover, `keeper truth where <topic>`, `keeper game scan` (keeper.js is the unified entry, with three daily commands built in — hello / status / where — and forwards the rest; each room's script can also run standalone; human manual at [references/cli.md](references/cli.md)).
+   - Copy the zero-dependency Node scripts from `scripts/` into the target project (suggested `tools/keeper/`), register `"keeper": "node tools/keeper/keeper.js"` in package.json — then the whole project has one door: `keeper hello` for shift handover, `keeper truth where <topic>`, `keeper game scan` (keeper.js is the unified entry, with three daily commands built in — hello / status / where — and forwards the rest; each room's script can also run standalone; human manual at [references/cli.md](references/cli.md)). The scripts are CommonJS (`require`). If the target project's package.json has `"type": "module"`, add a tiny `tools/keeper/package.json` with `{"type": "commonjs"}` so Node resolves the keeper dir as CJS (the nearest package.json wins) — otherwise `require` throws `ReferenceError: require is not defined in ES module scope`.
    - Or port equivalent implementations using the project's existing stack (Python / Shell / …) following the mechanisms in [references/](references/).
-   - Or skip scripts entirely and have the AI maintain the data files by hand (small projects can absolutely do this — the mechanism matters more than the tool).
+   - In script-free mode, maintain the authoritative records by hand. The editing rules below apply to each mode.
 
 ## Rooms at a glance
 
@@ -58,7 +58,7 @@ Every time this Skill is activated in a project:
 | 3 WIKI | Too many docs to browse / rule files scattered | (read-only, stateless) | `scripts/commands/docs-site.js` | [room-site.md](references/room-site.md) |
 | 4 Docs Translation Desk | Source changes, translations go stale, nobody notices | `docs-manifest.json` + `docs-state.json` | `scripts/commands/docs-i18n.js` | [room-i18n.md](references/room-i18n.md) |
 | 5 Game Text Desk | Hardcoded in-game text / stale translations / inconsistent terms | `game-i18n-manifest.json` + `glossary.json` | `scripts/commands/game-i18n.js` | [room-game-i18n.md](references/room-game-i18n.md) |
-| 6 Shipping Dock | Version numbers drift / acceptance is verbal / releases are chaotic | `version-manifest.json` + `sprints/N.md` + `CHANGELOG.md` | `scripts/commands/version-sync.js` + `sprint.js` + `release.js` | [room-shipping.md](references/room-shipping.md) |
+| 6 Shipping Dock | Version numbers drift / acceptance is verbal / releases are chaotic | `version-manifest.json` + `sprints/N.md` + `CHANGELOG.md` | `scripts/commands/version-sync.js` + `sprint.js` + `release.js` + `branch.js` | [room-shipping.md](references/room-shipping.md) |
 | 7 Schedule | "When does this ship?" / plans without dates slip silently | `schedule.json` | `scripts/commands/schedule.js` | [room-schedule.md](references/room-schedule.md) |
 
 **Suggested build order** (non-binding): most projects benefit most from starting with **Archive** + **Feedback Box**; build **Docs Translation Desk** and **Game Text Desk** only when there is a localization plan (the Game Text Desk triage includes "the one piece of advice you should heed even with no plan"); **WIKI** is an observation deck — install it once docs pile up; **Shipping Dock** should be ready before the first real release; **Schedule** slots in next to the Shipping Dock once versions have target dates — its Gantt view renders inside the WIKI.
@@ -70,7 +70,7 @@ The point of governance is to protect documents — never let governance itself 
 1. **Never delete the user's original files.** "Organizing docs" = registering them in the source of truth + building references, **not** moving, renaming, or deleting. When a duplicate or stale doc is found, report it to the user and await instruction — do not clean up on your own.
 2. **Archive instead of delete.** A doc that must be retired is, with user consent, moved into an `_archive/` directory (the WIKI and checkup ignore it by default) — never physically deleted.
 3. **Destructive operations need per-item authorization.** Overwrite-class actions (`init --force`, `extract --force`), bulk moves/renames, directory reorganizations — list the affected files before acting, execute only after user confirmation. One authorization covers one action only; it does not carry forward.
-4. **Edits go through the smallest cut.** Editing an existing doc uses section replacement only (`truth.js update`), never a full-file rewrite; data files (`feedback.json`, `docs-state.json`, etc.) are maintained only through their corresponding commands, never by hand-editing JSON.
+4. **Edit the smallest relevant section or record.** With scripts installed, use the corresponding command for managed data and section edits. Without scripts, edit the source record (for example `feedback.json`), parse the JSON and review the diff. Generated views and translation fingerprints are tool output. Leave unavailable checks pending and keep their source evidence.
 5. **Never run recursive deletes.** (`rm -rf`, `Remove-Item -Recurse`, etc.) Not for any reason, including "cleaning up test files" — even single-file deletes require user confirmation.
 6. **Reversible before you act.** When the project is under git, confirm the working tree is clean before large operations (if there are uncommitted changes, remind the user to commit or stash first) so everything can be rolled back.
 
@@ -100,14 +100,14 @@ Once rooms are installed, the AI abides by these long-term in this project:
 - Pre-release triple-check: `keeper game scan` + `keeper game drift --check` + `keeper game glossary lint`.
 
 **Version discipline (Shipping Dock)**
-- Version numbers change only via `keeper ver bump`; never hand-edit a single file.
+- With scripts, use `keeper ver bump`. In script-free mode update the approved version in every target of `version-manifest.json` together and compare the values.
 - Version level can be auto-computed from git history: `keeper ver next` previews, `keeper ver bump` (no arg) applies — `feat:` → minor, `fix:`/`perf:` → patch, `BREAKING` → major (downgraded to minor if `blockMajor` on 0.x).
 - Acceptance follows `keeper-profile.json`'s `review.mode` (see below).
 - A sprint item is done when its acceptance fields are satisfied — not when it feels done.
 
 **Release pipeline discipline (Shipping Dock · Release)**
 - Before `git commit`: `keeper release preflight commit` — scans staged files for debug residue (`console.log` / `debugger` / `TODO`), credential files (`.env` / `*.key` / `*.pem`), runs `node --check` on staged `.js`, and (if Archive/Docs Translation Desk installed) truth check + docs sync.
-- Before `git push`: `keeper release preflight push` — all commit checks + test suite + behind-remote + branch confirm (warns on `main`/`master`) + PROGRESS.md recency + `keeper sync`.
+- Before `git push`: `keeper release preflight push` — all commit checks + test suite + behind-remote + branch confirm (warns on `main`/`master`) + PROGRESS.md recency + `keeper sync --check`.
 - Before packaging a build: `keeper release preflight build` — version consistency + translations + sprint acceptance + clean worktree + release notes present + `keeper stale`.
 - Problems (❌) block; warnings (⚠️) inform. Preflight never auto-fixes — it tells you what to fix.
 - CHANGELOG lives in `CHANGELOG.md` (Keep a Changelog format): `keeper release changelog add "<text>"` appends to `[Unreleased]`; `keeper release changelog cut <X.Y.Z>` slices `[Unreleased]` into a versioned section with today's date.
@@ -122,7 +122,7 @@ Once rooms are installed, the AI abides by these long-term in this project:
 
 ## Acceptance modes (review.mode)
 
-Confirmed at triage, recorded in the profile. **A behavioral default, not a gate** — the CLI blocks nothing, only records (the item logs `approvedBy`).
+The profile chooses who reviews. Small tasks may self-check. Plan formal items with `--formal --covers`, source and criteria, then attach a run record for the tested commit. For a human decision, plan `--human-review` and retain its original receipt. `--by` always names the recorder. See [Shipping Dock](references/room-shipping.md).
 
 | Mode | Flow | Suited for |
 |------|------|------------|
@@ -217,7 +217,7 @@ The WIKI includes `START-HERE.md` in the root-docs group at the top of the sideb
 
 ## Core entry docs (create during triage)
 
-Beyond `AGENTS.md` and `START-HERE.md`, every project benefits from a small set of **core entry docs** that orient newcomers (humans and AI alike) without making them grep the whole repo. Create these at the project root during triage, right after `AGENTS.md` and `START-HERE.md`:
+Keep `AGENTS.md` and `START-HERE.md` at the root. Create the five enabled status and design documents below in `docs/`. Adopt existing documents in place. Entry commands look at the root first, then `docs/`. If both copies exist, reconcile ownership before editing.
 
 | Doc | Purpose | vs. its neighbors |
 |-----|---------|-------------------|
@@ -245,7 +245,7 @@ Beyond `AGENTS.md` and `START-HERE.md`, every project benefits from a small set 
 
 ### Auto-inclusion
 
-The WIKI auto-includes all five in the root-docs group alongside README/ROADMAP/START-HERE — visible from the moment you open the site. The sidebar's category grouping (entry / plan / architecture / design / art / feedback) puts them in the right bucket automatically; see [room-site.md](references/room-site.md) for the keyword table.
+The WIKI discovers these documents under its `docs/` scan directory and recognizes legacy root entries. For sidebar categories see [room-site.md](references/room-site.md).
 
 ### Opt out
 
@@ -265,13 +265,14 @@ indie-keeper/
 │   ├── room-site.md / .zh.md
 │   ├── room-i18n.md / .zh.md
 │   ├── room-game-i18n.md / .zh.md
-│   └── room-shipping.md / .zh.md
+│   ├── room-shipping.md / .zh.md
+│   └── room-schedule.md / .zh.md
 ├── scripts/                    ← zero-dependency Node reference implementations (copy / port)
 │   ├── keeper.js               ← unified entry + hello/status/where + daily commands
 │   ├── lang.js                 ← bilingual output helper (--lang > profile > default en)
-│   ├── lib/                    ← shared helpers
-│   └── commands/               ← one file per room (truth / feedback / docs-site / docs-i18n /
-│                                 game-i18n / version-sync / sprint / release / schedule)
+│   ├── project-files.js        ← registry locations
+│   └── commands/               ← room commands (truth / feedback / docs-site / docs-i18n /
+│                                 game-i18n / version-sync / sprint / release / branch / schedule)
 ├── templates/                  ← blank templates and samples for each data file + UIUX-SPEC template
 └── docs/                       ← this repo's own status docs (internal, Chinese)
     ├── zh/                     ← Chinese versions of root docs (README.zh.md, SKILL.zh.md)

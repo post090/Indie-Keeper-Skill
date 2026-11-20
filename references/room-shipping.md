@@ -30,14 +30,21 @@ Timeline division of labor: ROADMAP manages the future, **Sprint manages the pre
 ```bash
 node sprint.js new "workshop overhaul" --version v0.5
 node sprint.js add "asset manager" --accept "drag in an image to register · delete has confirm" --from "fb #3"
-node sprint.js approve 1.1 --by human:someone     # acceptance leaves a record (default self)
+node sprint.js approve 1.1 --by self               # lightweight self-check
 node sprint.js close --version v0.5.0              # archive after all clear + backfill ship
 ```
 
 - The file is `docs/sprints/N.md`, pure markdown, humans can read and edit directly
-- **Acceptance leaves a record, not a gate**: `approvedBy: self / agent:name / human:name` is a record; who nods follows the profile's `review.mode`; if the user says "just pass this one", listen to the user
+- Small tasks may use `approve` after self-checking. `--by` records who filed the result. A `human:` prefix is a self-declared label. Confirm a human decision at its original source.
 - `lint` quality check: light checks "is there an acceptance criterion"; strict adds implementation/test-method/risk/counter-question (must be a question) + **filler-word check** (vague phrases like "optimized" / "related issue" are flagged); if an item lists "wiring: file:symbol" it is verified in code — fighting AI sloppiness
-- On `approve`, quality-check problems are **advisory only, not blocking**
+- For formal acceptance, plan named cases with `sprint add "Save round trip" --formal --covers window,hud,reopen,bad-save --from "issue 3" --accept "HUD survives restart and the loader reports a corrupt save"`. Add `--human-review` when a person must decide.
+- Run the project’s own checks. Save a report in the project and run `sprint approve <id> --record evidence/run.json`. The report contains a full Git commit SHA, a run ID, the actual command and one passing entry for every planned case. For example, one coverage entry looks like this (replace placeholders with real values):
+
+```json
+{"commit":"<tested SHA>","run":"windows-01","command":"<project test command>","coverage":{"window":{"result":"passed","file":"window.png","sha256":"<64 hex digits>"}}}
+```
+
+  Artifact paths are relative to the report. For a required human decision, attach a separate original decision receipt under `review` with `file` and `sha256`. Keep the report and artifacts available. Approval pins the report digest and commit. Lint and close recheck them. A missing Windows window case stays pending even when headless tests pass. The project decides whether its HUD, save and error assertions passed. IK checks the recorded results and evidence integrity.
 
 ### Release pipeline (release.js)
 
@@ -50,7 +57,7 @@ Each stage scans the project state and reports problems (❌ blocking) + warning
 | Stage | Run before | What it checks |
 |-------|------------|----------------|
 | `keeper release preflight commit` | `git commit` | debug residue in staged source (`console.log` / `debugger` / `TODO` / `FIXME`) · credential files in staging (`.env` / `*.key` / `*.pem` / `id_rsa` / `*.keystore`) · `node --check` on staged `.js` · docs translation sync (if Docs Translation Desk installed) · truth check (if Archive installed) |
-| `keeper release preflight push` | `git push` | all commit checks · test suite (e2e or `npm test`) · behind-remote (warns if local needs pull) · branch confirm (warns on `main`/`master`) · PROGRESS.md recency (warns if last entry >3 days old) · `keeper sync` |
+| `keeper release preflight push` | `git push` | Projects that configure `repo.localOnlyBranches` block listed branches and detached HEAD. Other checks cover the commit, declared tests, upstream status, branch, PROGRESS recency and `keeper sync --check`. |
 | `keeper release preflight build` | packaging a build | version consistency (`keeper ver check`) · translations fresh · sprint acceptance complete (warns on pending items) · clean worktree (no uncommitted changes) · release notes file present (`CHANGELOG.md` / `docs/releases/`) · `keeper stale` all green |
 
 The AI runs the matching preflight before each irreversible action. Warnings are advisory — the user can override; problems must be fixed or explicitly accepted.
@@ -112,11 +119,11 @@ The CLI **never calls `gh` / `butler` / `steamcmd` directly** — it prints the 
 
 With the pipeline installed, a release is a fixed sequence; the AI executes each step, pausing for preflight:
 
-1. `keeper sprint lint` + approve all items → `keeper sprint close --version vX.Y.Z`
-2. `keeper release preflight build` — confirm version consistency + sprint accepted + clean tree + release notes ready
-3. `keeper ver next` (preview) → `keeper ver bump` (apply, auto-level from git log)
-4. `keeper release changelog cut <X.Y.Z>` — slice `[Unreleased]` into the versioned section
-5. `keeper release preflight commit` → `git commit -m "chore(release): vX.Y.Z"` → `keeper release preflight push` → `git push`
+1. Run `keeper sprint lint` and verify the agreed scope. Close a version-bound sprint once its version and closure are authorized.
+2. Preview the version with `keeper ver next` and apply the approved version.
+3. Run `keeper release changelog cut <X.Y.Z>` and review the release entry.
+4. Stage the intended files, run `keeper release preflight commit` and commit the candidate.
+5. From a clean checkout of that SHA, run `keeper release preflight build` and the project tests. Before an authorized push, check that the outgoing ref still resolves to the tested SHA. Recheck after any change.
 6. Platform publish (if installed): `git tag vX.Y.Z && git push origin vX.Y.Z` triggers the GitHub workflow; or manually `butler push` / `steamcmd +runscript`
 7. Cleanup: mark the corresponding ROADMAP version ✅; `keeper fb done <id> --version vX.Y.Z` backfill; archive HANDOFF.md
 
@@ -131,7 +138,7 @@ With the pipeline installed, a release is a fixed sequence; the AI executes each
 
 ## AI daily discipline
 
-- Version numbers only change via `bump`, never hand-edit a single file; use `ver next` to preview the auto-computed level before bumping
+- With scripts installed, use `ver next` and `ver bump`. In manual mode, update and verify all registered targets together.
 - "Done" for an item means its acceptance fields are satisfied, not a feeling; in strict mode, self-check for filler words when writing fields
 - Before each `git commit` / `git push` / build packaging, run the matching `keeper release preflight <stage>` — don't skip it just because "it's probably fine"
 - After `close`, immediately do step 7 cleanup — do not let it pile up

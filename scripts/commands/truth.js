@@ -8,7 +8,7 @@
 //   node truth.js where <topic>                   topic → authoritative doc + anchor
 //   node truth.js list                            list every registered topic
 //   node truth.js sections <doc>                  list a doc's sections (look before update)
-//   node truth.js update <doc> --section "<title>" --content "..." [--append]
+//   node truth.js update <doc> --section "<title>" [--parent "<heading>"] --content "..." [--append]
 //                                                 safe section replace (never whole-file rewrites)
 //   node truth.js check                           checkup: dead links / untracked docs / rule-file refs
 //   node truth.js init                            scan current state into a draft registry
@@ -21,7 +21,7 @@ const path = require('path');
 const { detectLang, makeT } = require('../lang');
 
 // ── argv parsing: both --name=value and --name value are accepted ──
-const VALUE_FLAGS = new Set(['section', 'content', 'file', 'root', 'source', 'lang']);
+const VALUE_FLAGS = new Set(['section', 'parent', 'content', 'file', 'root', 'source', 'lang']);
 
 function parseArgv(raw) {
   const flags = {}; const bools = new Set(); const pos = [];
@@ -44,7 +44,7 @@ const A = parseArgv(process.argv.slice(2));
 function flag(name, dflt) { return name in A.flags ? A.flags[name] : dflt; }
 
 const ROOT = path.resolve(flag('root', process.cwd()));
-const CANDIDATES = ['truth-source.json', 'docs/truth-source.json', '.docs/truth-source.json'];
+const CANDIDATES = require('../project-files').truth;
 
 // Common rule-file locations (shared with the WIKI)
 const RULE_FILES = [
@@ -68,10 +68,11 @@ const MSG = {
   docMulti: { en: 'Multiple matches:\n{0}', zh: '多个匹配：\n{0}' },
   sectionsHead: { en: '\nSections of {0}:\n', zh: '\n{0} 的章节：\n' },
   updateUsage: {
-    en: 'Usage: truth.js update <doc> --section "<title>" --content "..." [--append]\n  or --file=<path> to read content from a file',
-    zh: '用法：truth.js update <doc> --section "<标题>" --content "..." [--append]\n  或 --file=<路径> 从文件读内容',
+    en: 'Usage: truth.js update <doc> --section "<title>" [--parent "<heading>"] --content "..." [--append]\n  or --file=<path> to read content from a file',
+    zh: '用法：truth.js update <doc> --section "<标题>" [--parent "<上级标题>"] --content "..." [--append]\n  或 --file=<路径> 从文件读内容',
   },
   noContent: { en: 'Missing content: --content="..." or --file=<path>', zh: '缺少内容：--content="..." 或 --file=<路径>' },
+  ambiguousSection: { en: 'Several sections match "{0}". Use an exact heading and --parent "<heading>" to narrow the match.', zh: '多个章节匹配“{0}”。请使用完整标题，用 --parent "<上级标题>" 限定范围。' },
   sectionMiss: { en: '✗ Section "{0}" not found. Existing sections:', zh: '✗ 没找到章节"{0}"。现有章节：' },
   replaced: { en: '✓ {0} §{1} replaced', zh: '✓ {0} §{1} 已替换' },
   appended: { en: '✓ {0} §{1} appended', zh: '✓ {0} §{1} 已追加' },
@@ -101,7 +102,7 @@ const MSG = {
   truth.js where <topic>      topic → authoritative doc + anchor (aliases supported)
   truth.js list               list every registered topic
   truth.js sections <doc>     list a doc's sections
-  truth.js update <doc> --section "<title>" --content "..." [--append] [--file=]
+  truth.js update <doc> --section "<title>" [--parent "<heading>"] --content "..." [--append] [--file=]
   truth.js check              checkup: dead links / untracked docs / rule-file refs (exit 1 on problems)
   truth.js init [--force]     scan current state into a draft registry
 
@@ -112,7 +113,7 @@ const MSG = {
   truth.js where <主题>       主题 → 权威文档 + 锚点（支持 aliases 别名）
   truth.js list               列出全部登记
   truth.js sections <doc>     列出文档章节
-  truth.js update <doc> --section "<标题>" --content "..." [--append] [--file=]
+  truth.js update <doc> --section "<标题>" [--parent "<上级标题>"] --content "..." [--append] [--file=]
   truth.js check              体检：死链 / 未登记文档 / 守则引用死链（有问题 exit 1）
   truth.js init [--force]     扫描现状生成登记表草稿
 
@@ -192,11 +193,15 @@ function parseSections(text) {
   const lines = text.split('\n');
   const sections = [];
   let cur = { level: 0, title: '', headingLine: null, lines: [] };
-  let inFence = false;
+  let fence = '';
   for (const l of lines) {
-    if (/^\s*(```|~~~)/.test(l)) inFence = !inFence;
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(l.replace(/\r$/, ''));
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1].startsWith(fence) && !marker[2].trim()) fence = '';
+    }
     // strip a trailing \r before matching (Windows CRLF); keep the line itself intact
-    const m = !inFence && l.replace(/\r$/, '').match(/^(#{1,6})\s+(.*)$/);
+    const m = !fence && l.replace(/\r$/, '').match(/^(#{1,6})\s+(.*)$/);
     if (m) {
       sections.push(cur);
       cur = { level: m[1].length, title: m[2].trim(), headingLine: l, lines: [] };
@@ -210,11 +215,23 @@ function parseSections(text) {
 
 function normTitle(s) { return String(s).replace(/^#+\s*/, '').replace(/^[§\s]+/, '').trim(); }
 
-function findSectionIndex(sections, query) {
+function findSectionIndex(sections, query, parent) {
   const q = normTitle(query);
-  let idx = sections.findIndex(s => s.headingLine && normTitle(s.title) === q);
-  if (idx < 0) idx = sections.findIndex(s => s.headingLine && normTitle(s.title).includes(q));
-  return idx;
+  const ancestors = [];
+  const matches = [];
+  for (const [index, section] of sections.entries()) {
+    if (!section.headingLine) continue;
+    while (ancestors.length && ancestors[ancestors.length - 1].level >= section.level) ancestors.pop();
+    const title = normTitle(section.title);
+    if (title.includes(q) && (!parent || ancestors.some(s => normTitle(s.title) === normTitle(parent)))) {
+      matches.push({ index, title });
+    }
+    ancestors.push(section);
+  }
+  const exact = matches.filter(m => m.title === q);
+  const candidates = exact.length ? exact : matches;
+  if (candidates.length > 1) fail(t('ambiguousSection', query));
+  return candidates.length ? candidates[0].index : -1;
 }
 
 function rebuild(sections) {
@@ -271,13 +288,13 @@ function cmdUpdate(args) {
   if (!name || !section) fail(t('updateUsage'));
   if (contentFile) content = fs.readFileSync(path.resolve(ROOT, contentFile), 'utf8');
   if (!content) fail(t('noContent'));
-  content = content.replace(/\\n/g, '\n');
+  if (!contentFile) content = content.replace(/\\n/g, '\n');
 
   const p = resolveDoc(name);
   if (!p) fail(t('docMiss', name));
   const text = fs.readFileSync(p, 'utf8');
   const sections = parseSections(text);
-  const idx = findSectionIndex(sections, section);
+  const idx = findSectionIndex(sections, section, flag('parent', ''));
   if (idx < 0) {
     console.error(t('sectionMiss', section));
     for (const s of sections) if (s.headingLine) console.error('    ' + s.title);

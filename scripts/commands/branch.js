@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // branch.js · Shipping Dock: branch naming policy + protected-branch guard (zero deps)
 // ─────────────────────────────────────────────────────────────
-// Reference implementation of the indie-keeper branch governance (fb #6).
+// Reference implementation of the indie-keeper branch governance.
 // Small teams rarely write their branch rules down, so every repo ends up
 // with main/master coexisting and mystery branches. One policy in
 // keeper-profile.json; one command to check it, one to create compliant

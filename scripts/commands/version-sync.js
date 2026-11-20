@@ -68,6 +68,7 @@ const MSG = {
   showBad: { en: '  ⚠ Mismatch: {0} — use the set command to align\n', zh: '  ⚠ 不一致：{0}——用 set 命令拉齐\n' },
   showNone: { en: '(nothing readable)', zh: '（一个都没读出来）' },
   checkBroken: { en: '  ✗ {0}: {1}', zh: '  ✗ {0}：{1}' },
+  codeMismatch: { en: '  ✗ {0}: expected build {1}, found {2}', zh: '  ✗ {0}：应为构建号 {1}，实际为 {2}' },
   checkMismatch: { en: '  ✗ Versions disagree across files: {0}', zh: '  ✗ 各处版本号不一致：{0}' },
   checkOk: { en: '✓ Versions consistent everywhere: {0}', zh: '✓ 各处版本号一致：{0}' },
   skipMissing: { en: '  ⚠ skipped {0} (file not found)', zh: '  ⚠ 跳过 {0}（文件不存在）' },
@@ -153,7 +154,7 @@ function lastVersionTag() {
 // Parse conventional commits from `git log <range> --format=%s%n%b` output.
 // Returns { breaking, feat, fix, other } counts and the recommended bump level.
 function parseConventionalCommits(logText) {
-  const commits = logText.split('\n\n').filter(Boolean); // commits separated by blank line (subject + body)
+  const commits = logText.split(logText.includes('\0') ? '\0' : '\n\n').map(s => s.trim()).filter(Boolean);
   let breaking = 0, feat = 0, fix = 0, other = 0;
   // Match subject lines: "type(scope)!: description" or "type: description"
   const subjectRe = /^(feat|fix|perf|refactor|docs|style|test|chore|ci|build|revert)(\([^)]*\))?(!)?:\s/;
@@ -164,7 +165,7 @@ function parseConventionalCommits(logText) {
     const m = subjectRe.exec(subject);
     // BREAKING: explicit "!" after type/scope, or "BREAKING CHANGE:" in body
     const hasBang = m && m[3] === '!';
-    const hasBodyBreaking = /BREAKING[ -]CHANGE/i.test(body);
+    const hasBodyBreaking = /^BREAKING[ -]CHANGE:/m.test(body);
     if (hasBang || hasBodyBreaking) { breaking++; continue; }
     if (m) {
       if (m[1] === 'feat') feat++;
@@ -191,7 +192,7 @@ function computeNext(manifest) {
 
   const tag = lastVersionTag();
   const range = tag ? `${tag}..HEAD` : 'HEAD';
-  const logR = git(['log', range, '--format=%s%n%b']);
+  const logR = git(['log', range, '--format=%s%n%b%x00']);
   if (!logR.ok) return { level: null, cur, next: cur, error: 'no-git' };
   const logText = logR.out;
   if (!logText.trim()) return { level: null, cur, next: cur, error: 'no-commits', tag };
@@ -271,9 +272,10 @@ function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function compile(pattern) {
   const groups = [];
-  const re = escapeRe(pattern)
-    .replace(/\\\{\\\{version\\\}\\\}/g, () => { groups.push('version'); return '([0-9]+\\.[0-9]+\\.[0-9]+)'; })
-    .replace(/\\\{\\\{code\\\}\\\}/g, () => { groups.push('code'); return '([0-9]+)'; });
+  const re = escapeRe(pattern).replace(/\\\{\\\{(version|code)\\\}\\\}/g, (_, key) => {
+    groups.push(key);
+    return key === 'version' ? '([0-9]+\\.[0-9]+\\.[0-9]+)' : '([0-9]+)';
+  });
   if (!groups.length) fail(t('noPlaceholder', pattern));
   return { re: new RegExp(re), groups };
 }
@@ -292,18 +294,18 @@ function readTarget(target) {
   return { ...target, exists: true, matched: true, values };
 }
 
-function writeTarget(target, version, code) {
+function prepareTarget(target, version, code, text) {
   const p = path.join(ROOT, target.file);
-  let text = fs.readFileSync(p, 'utf8');
+  if (text === undefined) text = fs.readFileSync(p, 'utf8');
   for (const pattern of target.patterns) {
     const { re } = compile(pattern);
     const replacement = pattern
       .replace(/\{\{version\}\}/g, version)
       .replace(/\{\{code\}\}/g, String(code));
     if (!re.test(text)) fail(t('patternNotFound', target.file, pattern));
-    text = text.replace(re, replacement);
+    text = text.replace(re, () => replacement);
   }
-  fs.writeFileSync(p, text, 'utf8');
+  return { path: p, text };
 }
 
 // ── commands ──
@@ -313,12 +315,15 @@ function collect(manifest) {
   const versions = new Set(
     reads.filter(r => r.exists && r.matched && r.values.version).map(r => r.values.version)
   );
-  return { reads, versions };
+  const version = versions.size === 1 ? [...versions][0] : null;
+  const expectedCode = version && String(codeOf(parseSemver(version)));
+  const codeErrors = version ? reads.filter(r => r.matched && r.values.code && Number(r.values.code) !== Number(expectedCode)) : [];
+  return { reads, versions, expectedCode, codeErrors };
 }
 
 function cmdShow() {
   const manifest = loadManifest();
-  const { reads, versions } = collect(manifest);
+  const { reads, versions, expectedCode, codeErrors } = collect(manifest);
   console.log('');
   for (const r of reads) {
     if (!r.exists) { console.log(t('showMissing', r.file)); continue; }
@@ -328,15 +333,17 @@ function cmdShow() {
     console.log(`  ✓ ${r.file}: ${parts}`);
   }
   console.log('');
-  if (versions.size === 1) console.log(t('showOk', [...versions][0]));
+  for (const r of codeErrors) console.log(t('codeMismatch', r.file, expectedCode, r.values.code));
+  if (!codeErrors.length && versions.size === 1 && reads.every(r => r.exists && r.matched)) console.log(t('showOk', [...versions][0]));
   else console.log(t('showBad', [...versions].join(' vs ') || t('showNone')));
 }
 
 function cmdCheck() {
   const manifest = loadManifest();
-  const { reads, versions } = collect(manifest);
+  const { reads, versions, expectedCode, codeErrors } = collect(manifest);
   const broken = reads.filter(r => !r.exists || !r.matched);
-  if (broken.length || versions.size !== 1) {
+  if (broken.length || codeErrors.length || versions.size !== 1) {
+    for (const r of codeErrors) console.error(t('codeMismatch', r.file, expectedCode, r.values.code));
     for (const r of broken) console.error(t('checkBroken', r.file, !r.exists ? t('fileMissing') : t('noMatch')));
     if (versions.size > 1) console.error(t('checkMismatch', [...versions].join(' vs ')));
     process.exit(1);
@@ -347,10 +354,16 @@ function cmdCheck() {
 function applyAll(manifest, version) {
   const sem = parseSemver(version);
   const code = codeOf(sem);
+  const changes = new Map();
   for (const tg of manifest.targets) {
-    const r = readTarget(tg);
-    if (!r.exists) { console.log(t('skipMissing', tg.file)); continue; }
-    writeTarget(tg, version, code);
+    const file = path.resolve(ROOT, tg.file);
+    if (!fs.existsSync(file)) { console.log(t('skipMissing', tg.file)); continue; }
+    const previous = changes.get(file);
+    changes.set(file, { ...prepareTarget(tg, version, code, previous?.text), tg });
+  }
+  for (const change of changes.values()) {
+    const { tg } = change;
+    fs.writeFileSync(change.path, change.text, 'utf8');
     const hasCode = tg.patterns.some(p => p.includes('{{code}}'));
     console.log(hasCode ? t('appliedCode', tg.file, version, code) : t('applied', tg.file, version));
   }

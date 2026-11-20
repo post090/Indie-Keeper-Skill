@@ -30,14 +30,21 @@
 ```bash
 node sprint.js new "工坊大改" --version v0.5
 node sprint.js add "资产管理器" --accept "拖入图片能登记 · 删除有确认" --from "fb #3"
-node sprint.js approve 1.1 --by human:某人     # 验收留痕（默认 self）
+node sprint.js approve 1.1 --by self           # 小任务自验
 node sprint.js close --version v0.5.0          # 全清后归档 + 回填 ship
 ```
 
 - 文件是 `docs/sprints/N.md` 纯 markdown，人可直接读改
-- **验收留痕不设卡**：`approvedBy: self / agent:名 / human:名` 是记录，谁点头按 profile 的 `review.mode` 走，用户随口说"这条直接过"就听用户的
+- 小任务可以自己核对标准再 `approve`。`--by` 只记录填报人。即使填 `human:某人`，仍须到原始来源核对该人的决定。
 - `lint` 质检：light 档查"有没有验收标准"；strict 档加查实现/测法/风险/反诘（必须疑问句）+ **敷衍词检查**（"优化了""相关问题"这类空话直接抓）；条目写了「接线：文件:符号」还会去代码里核实——专治 AI 糊弄
-- approve 时若有质检问题只**提示不拦截**
+- 正式验收先登记范围，例如 `sprint add "存档往返" --formal --covers window,hud,reopen,bad-save --from "反馈 3" --accept "重开后 HUD 数值保留，坏档触发加载错误"`。需要真人决定的条目另加 `--human-review`。
+- 跑项目自己的测试，把运行记录保存在项目内，用 `sprint approve <id> --record evidence/run.json` 登记。记录写明完整 Git SHA、运行编号、实际命令，每个约定用例都须有通过结果与产物。下面只展示一个用例的格式，占位符须换成实测值。
+
+```json
+{"commit":"<被测 SHA>","run":"windows-01","command":"<项目测试命令>","coverage":{"window":{"result":"passed","file":"window.png","sha256":"<64 位十六进制摘要>"}}}
+```
+
+  产物路径相对运行记录。需人工决定时，在 `review` 中用 `file` 和 `sha256` 引用单独的原始确认凭据。保留记录和产物。验收时固定记录摘要与提交，质检和关单时复验。只跑 headless 会留下 Windows 窗口用例待验。HUD、读档和错误断言由游戏判断，IK 核对记录的结果与证据完整性。
 
 ### 发布流水线（release.js）
 
@@ -50,7 +57,7 @@ node sprint.js close --version v0.5.0          # 全清后归档 + 回填 ship
 | 阶段 | 跑的时机 | 查什么 |
 |------|----------|--------|
 | `keeper release preflight commit` | `git commit` 前 | 已暂存源码里的调试残留（`console.log` / `debugger` / `TODO` / `FIXME`）· 暂存区里的凭证文件（`.env` / `*.key` / `*.pem` / `id_rsa` / `*.keystore`）· 已暂存的 `.js` 跑 `node --check` · 文档翻译同步（装了文档翻译部才查）· 真相源体检（装了档案室才查） |
-| `keeper release preflight push` | `git push` 前 | commit 全部检查 · 测试套件（e2e 或 `npm test`）· 是否落后远程（落后会警告）· 分支确认（`main`/`master` 会警告）· PROGRESS.md 时效（上一条超过 3 天会警告）· `keeper sync` |
+| `keeper release preflight push` | `git push` 前 | 配置 `repo.localOnlyBranches` 的项目拦截清单中的分支和游离 HEAD。其他检查覆盖提交、项目声明的测试、上游、分支、PROGRESS 时效与 `keeper sync --check`。 |
 | `keeper release preflight build` | 打包构建前 | 版本号一致性（`keeper ver check`）· 翻译是否同步 · sprint 验收是否完成（有待验收条目会警告）· 工作区干净（有未提交改动会拦）· release notes 文件存在（`CHANGELOG.md` / `docs/releases/`）· `keeper stale` 全绿 |
 
 AI 在每个不可逆动作前跑对应的 preflight。警告是建议——用户可以 override；问题必须修掉或显式接受。
@@ -112,11 +119,11 @@ CLI **绝不直接调 `gh` / `butler` / `steamcmd`**——打印命令让用户/
 
 装了发布流水线后，一次发版是固定序列；AI 每步都跑 preflight 暂停：
 
-1. `keeper sprint lint` + 全部条目 approve → `keeper sprint close --version vX.Y.Z`
-2. `keeper release preflight build` —— 确认版本号一致 + sprint 已验收 + 工作区干净 + release notes 就绪
-3. `keeper ver next`（预览）→ `keeper ver bump`（应用，从 git log 自动算级别）
-4. `keeper release changelog cut <X.Y.Z>` —— 把 `[Unreleased]` 切成版本段
-5. `keeper release preflight commit` → `git commit -m "chore(release): vX.Y.Z"` → `keeper release preflight push` → `git push`
+1. 运行 `keeper sprint lint`，核对约定范围。版本相关 Sprint 等版本与关单决定落定后再关闭。
+2. 用 `keeper ver next` 预览，写入已获确认的版本号。
+3. 运行 `keeper release changelog cut <X.Y.Z>` 并审阅对应更新记录。
+4. 暂存预期文件，运行 `keeper release preflight commit`，提交候选版本。
+5. 在该 SHA 的干净检出中跑 `keeper release preflight build` 和项目测试。获准推送前核对待推引用仍指向该 SHA。有变动就重新验证。
 6. 平台发布（如果装了）：`git tag vX.Y.Z && git push origin vX.Y.Z` 触发 GitHub workflow；或手动 `butler push` / `steamcmd +runscript`
 7. 善后：ROADMAP 对应版本标 ✅、`keeper fb done <id> --version vX.Y.Z` 回填、归档 HANDOFF.md
 
@@ -131,7 +138,7 @@ CLI **绝不直接调 `gh` / `butler` / `steamcmd`**——打印命令让用户/
 
 ## AI 日常纪律
 
-- 版本号只走 `bump`，不手改单个文件；bump 前先用 `ver next` 预览自动算的级别
+- 有脚本时用 `ver next` 和 `ver bump`。手工模式一次性更新并核对登记的全部目标。
 - 条目"做完了"的标准是验收字段，不是感觉；strict 档写字段时先自查敷衍词
 - 每次 `git commit` / `git push` / 打包构建前，跑对应的 `keeper release preflight <阶段>`——别因为"应该没事"就跳过
 - close 后立刻做第 7 步善后，别攒

@@ -10,14 +10,14 @@
 // Rigor: sprint.rigor in keeper-profile.json (light | strict, default light)
 //   light   items need: title + acceptance
 //   strict  items need: title + acceptance(≥2 scenarios) + impl + testing + risk + self-doubt(question)
-// Sign-off trail: approve writes approvedBy (self / agent:name / human:name) — a record, not a gate.
+// approvedBy identifies the recorder. Formal items also pin their tested evidence.
 //
 // Usage:
 //   node sprint.js new "<title>" [--version v0.5]    start a sprint
 //   node sprint.js list                              all sprints at a glance
 //   node sprint.js show [N]                          details (default: active sprint)
 //   node sprint.js add "<title>" [--accept "case1 · case2"] [--from "fb #6"]
-//   node sprint.js approve <id> [--by human:iseik]   sign one off (default by self)
+//   node sprint.js approve <id> [--by human:reviewer]   sign one off (default by self)
 //   node sprint.js drop <id> [--reason "..."]        cut one
 //   node sprint.js lint [N]                          quality scan: missing fields / vague words
 //   node sprint.js close [--version vX.Y.Z]          archive the active sprint
@@ -27,10 +27,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
+const { spawnSync } = require('child_process');
 const { detectLang, makeT } = require('../lang');
 
 // ── argv parsing ──
-const VALUE_FLAGS = new Set(['root', 'version', 'accept', 'from', 'by', 'reason', 'impl', 'test', 'risk', 'ask', 'lang']);
+const VALUE_FLAGS = new Set(['root', 'version', 'accept', 'from', 'by', 'reason', 'impl', 'test', 'risk', 'ask', 'lang', 'covers', 'record']);
 function parseArgv(raw) {
   const flags = {}; const bools = new Set(); const pos = [];
   for (let i = 0; i < raw.length; i++) {
@@ -73,6 +75,15 @@ function getField(it, key) { return it.fields[FIELDS[key].en] ?? it.fields[FIELD
 function setField(it, key, v) { it.fields[fName(key)] = v; }
 
 const MSG = {
+  formalHelp: { en: 'Formal: add --formal --covers case1,case2 --from source --accept criterion; approve <id> --record path/to/run.json. --by identifies the recorder.', zh: '正式验收：add --formal --covers 用例1,用例2 --from 来源 --accept 标准；approve <id> --record 运行记录.json。--by 标识填报人。' },
+  formalSetup: { en: 'Formal acceptance requires --from, --accept and named coverage (--covers).', zh: '正式验收需要 --from、--accept 及 --covers 指定的覆盖项。' },
+  recordInvalid: { en: 'Invalid or missing run record: {0}', zh: '运行记录缺失或无效：{0}' },
+  recordCommit: { en: 'The record needs a resolvable full commit SHA, run ID and command.', zh: '记录须含可解析的完整提交 SHA、运行编号及命令。' },
+  recordCoverage: { en: 'Missing passing result or matching artifact SHA-256 for {0}', zh: '{0} 缺少通过结果或与 SHA-256 一致的产物' },
+  recordDrift: { en: 'The approved report digest or tested commit changed.', zh: '已验收记录的摘要或被测提交已变化。' },
+  recordOnly: { en: '--record applies to items planned with --formal --covers.', zh: '--record 用于以 --formal --covers 登记的条目。' },
+  reviewMissing: { en: 'Attach a separate human decision receipt (review.file and review.sha256). Confirm its author at the original source.', zh: '请附上独立的人工决定凭据（review.file 和 review.sha256），并在原始来源核对身份。' },
+  recorder: { en: 'reported by {0}', zh: '填报人 {0}' },
   newUsage: { en: 'Usage: sprint.js new "<title>" [--version v0.5]', zh: '用法：sprint.js new "<标题>" [--version v0.5]' },
   stillOpen: { en: 'sprint {0} ({1}) is still in progress. Close it first, or just add into it.', zh: 'sprint {0}（{1}）还在进行中。先 close 它，或直接往里 add。' },
   started: { en: '✓ sprint {0} started: {1}', zh: '✓ sprint {0} 已开工：{1}' },
@@ -88,10 +99,10 @@ const MSG = {
   addedTo: { en: '✓ {0} · {1} added to sprint {2}', zh: '✓ {0} · {1} 已加入 sprint {2}' },
   noAccept: { en: '  ⚠ no acceptance criteria yet (--accept) · lint will flag it', zh: '  ⚠ 还没写验收标准（--accept）· lint 会报' },
   strictNeeds: { en: '  strict rigor also wants: --impl --test --risk --ask (lint checks them)', zh: '  strict 档还需要：--impl --test --risk --ask（lint 会查）' },
-  approveUsage: { en: 'Usage: sprint.js approve <id> [--by human:iseik]', zh: '用法：sprint.js approve <id> [--by human:小车]' },
+  approveUsage: { en: 'Usage: sprint.js approve <id> [--by human:reviewer]', zh: '用法：sprint.js approve <id> [--by human:审核人]' },
   notPending: { en: '{0} is not in the pending list (run show to see it)', zh: '待验收里没有 {0}（show 看当前清单）' },
   lintWarn: { en: '  ⚠ {0} has lint problems (approving anyway · informational only):', zh: '  ⚠ {0} 有质检问题（照常验收·仅提示）：' },
-  approved: { en: '✓ {0} · {1} accepted ✍{2}', zh: '✓ {0} · {1} 已验收 ✍{2}' },
+  approved: { en: '✓ {0} · {1} accepted · {2}', zh: '✓ {0} · {1} 已验收 · {2}' },
   allDone: { en: '  🎉 sprint {0} fully accepted · ready to close', zh: '  🎉 sprint {0} 全部验收完 · 可以 close 了' },
   dropUsage: { en: 'Usage: sprint.js drop <id> [--reason "..."]', zh: '用法：sprint.js drop <id> [--reason "..."]' },
   notPendingShort: { en: '{0} is not in the pending list', zh: '待验收里没有 {0}' },
@@ -199,7 +210,7 @@ function listNumbers() {
 //   - risk: …        (strict)
 //   - self-doubt: …? (strict · must be a question)
 //   - source: fb #6
-//   - approvedBy: human:iseik (written on approve)
+//   - approvedBy: human:reviewer (written on approve)
 //   - ship: vX.Y.Z (written on close)
 function parseItems(body) {
   const pending = [], approved = [];
@@ -302,8 +313,9 @@ function cmdShow(args) {
   if (sp.items.approved.length) {
     console.log(t('approvedHead'));
     for (const it of sp.items.approved) {
-      const by = it.fields['approvedBy'] ? ` ✍${it.fields['approvedBy']}` : '';
+      const by = it.fields.approvedBy ? ' · ' + t('recorder', it.fields.approvedBy) : '';
       console.log(`  [x] ${it.id} · ${it.title}${by}`);
+      if (it.fields.covers) console.log(`      ${it.fields.commit} · ${it.fields.covers} · ${it.fields.record}`);
     }
   }
   console.log('');
@@ -323,6 +335,12 @@ function cmdAdd(args) {
   if (flag('risk', '')) setField(it, 'risk', flag('risk', ''));
   if (flag('ask', '')) setField(it, 'ask', flag('ask', ''));
   if (flag('from', '')) setField(it, 'from', flag('from', ''));
+  if (A.bools.has('formal') || A.flags.formal !== undefined || A.flags.covers !== undefined || A.bools.has('covers') || A.bools.has('human-review')) {
+    const cases = flag('covers', '').split(',').map(s => s.trim());
+    if (!getField(it, 'from') || !getField(it, 'accept') || cases.some(s => !s || /[\r\n]/.test(s))) fail(t('formalSetup'));
+    it.fields.covers = [...new Set(cases)].join(',');
+    if (A.bools.has('human-review')) it.fields.humanReview = 'required';
+  }
   sp.items.pending.push(it);
   writeSprint(sp);
   console.log(t('addedTo', id, title, sp.n));
@@ -339,8 +357,13 @@ function cmdApprove(args) {
   const i = sp.items.pending.findIndex(it => it.id === id);
   if (i < 0) fail(t('notPending', id));
   const it = sp.items.pending[i];
-  // pre-approval lint (informational only · the trail is a record, not a gate)
   const problems = lintItem(it, loadRigor());
+  if (it.fields.covers) {
+    if (problems.length) fail(problems.join('\n'));
+    it.fields.record = flag('record', '');
+    try { Object.assign(it.fields, verifyRecord(it)); }
+    catch (err) { fail(err.message); }
+  } else if (['record', 'formal', 'covers', 'human-review'].some(k => k in A.flags || A.bools.has(k))) fail(t('recordOnly'));
   if (problems.length) {
     console.log(t('lintWarn', id));
     for (const p of problems) console.log(`    - ${p}`);
@@ -351,7 +374,7 @@ function cmdApprove(args) {
   sp.items.pending.splice(i, 1);
   sp.items.approved.push(it);
   writeSprint(sp);
-  console.log(t('approved', id, it.title, it.fields['approvedBy']));
+  console.log(t('approved', id, it.title, t('recorder', it.fields.approvedBy)));
   if (!sp.items.pending.length) console.log(t('allDone', sp.n));
 }
 
@@ -371,6 +394,60 @@ function cmdDrop(args) {
 }
 
 // ── lint ──
+
+// Reports live under the project. Resolve links before reading any artifact.
+function evidencePath(base, name) {
+  if (typeof name !== 'string' || !name.trim() || /[\r\n]/.test(name) || path.isAbsolute(name)) throw Error(t('recordInvalid', name || '--record'));
+  const target = fs.realpathSync(path.resolve(base, name));
+  const rel = path.relative(fs.realpathSync(ROOT), target);
+  if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel) || !fs.statSync(target).isFile()) throw Error(t('recordInvalid', name));
+  return target;
+}
+
+function sha256(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
+
+function verifiedArtifact(dir, entry) {
+  const file = evidencePath(dir, entry.file);
+  const digest = createHash('sha256');
+  const buf = Buffer.alloc(65536);
+  const fd = fs.openSync(file, 'r');
+  try {
+    if (!fs.fstatSync(fd).size) throw Error(t('recordInvalid', entry.file));
+    let length;
+    while ((length = fs.readSync(fd, buf, 0, buf.length, null)) > 0) digest.update(buf.subarray(0, length));
+  } finally { fs.closeSync(fd); }
+  if (digest.digest('hex') !== entry.sha256) throw Error(t('recordInvalid', entry.file));
+  return file;
+}
+
+function verifyRecord(it) {
+  let reportPath, bytes, report;
+  try {
+    reportPath = evidencePath(ROOT, it.fields.record);
+    bytes = fs.readFileSync(reportPath);
+    report = JSON.parse(bytes.toString('utf8'));
+  } catch { throw Error(t('recordInvalid', it.fields.record || '--record')); }
+  if (!report || typeof report.commit !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(report.commit) ||
+      ![report.run, report.command].every(v => typeof v === 'string' && v.trim())) throw Error(t('recordCommit'));
+  const rev = spawnSync('git', ['--no-replace-objects', 'rev-parse', '--verify', report.commit + '^{commit}'], { cwd: ROOT, encoding: 'utf8' });
+  if (rev.status !== 0 || rev.stdout.trim() !== report.commit) throw Error(t('recordCommit'));
+  const recordSha256 = sha256(bytes);
+  if (it.checked && (recordSha256 !== it.fields.recordSha256 || report.commit !== it.fields.commit)) throw Error(t('recordDrift'));
+  const artifacts = new Set([reportPath]);
+  const dir = path.dirname(reportPath);
+  for (const name of it.fields.covers.split(',')) {
+    const entry = report.coverage && Object.prototype.hasOwnProperty.call(report.coverage, name) && report.coverage[name];
+    try {
+      if (entry?.result !== 'passed') throw Error();
+      artifacts.add(verifiedArtifact(dir, entry));
+    } catch { throw Error(t('recordCoverage', name)); }
+  }
+  if (it.fields.humanReview === 'required') {
+    try { if (artifacts.has(verifiedArtifact(dir, report.review))) throw Error(); }
+    catch { throw Error(t('reviewMissing')); }
+  }
+  return { commit: report.commit, recordSha256 };
+}
 
 // Vague phrases: their presence means the field says nothing concrete
 // (anti hand-waving; the zh list catches zh docs, the en list catches en docs)
@@ -412,6 +489,10 @@ function lintItem(it, rigor) {
     if (ask && !/[？?]$/.test(ask)) problems.push(t('askNotQuestion'));
   }
   problems.push(...lintWires(it));
+  if (it.fields.covers && it.checked) {
+    try { verifyRecord(it); }
+    catch (err) { problems.push(err.message); }
+  }
   for (const [k, v] of Object.entries(it.fields)) {
     for (const w of VAGUE) {
       if (v.includes(w)) { problems.push(t('vagueWord', k, w)); break; }
@@ -447,6 +528,11 @@ function cmdClose() {
     fail(t('closeBlocked'));
   }
   const version = flag('version', '');
+  for (const it of sp.items.approved) {
+    if (!it.fields.covers || getField(it, 'cut')) continue;
+    try { verifyRecord(it); }
+    catch (err) { fail(it.id + ' · ' + err.message); }
+  }
   sp.fm.status = 'archived';
   sp.fm.closed = today();
   if (version) {
@@ -463,7 +549,7 @@ function cmdClose() {
 function main() {
   const cmd = A.pos[0];
   const rest = A.pos.slice(1);
-  if (!cmd || cmd === 'help') { console.log(t('help')); return; }
+  if (!cmd || cmd === 'help') { console.log(t('help') + t('formalHelp')); return; }
   const table = { new: cmdNew, list: cmdList, show: cmdShow, add: cmdAdd, approve: cmdApprove, drop: cmdDrop, lint: cmdLint, close: cmdClose };
   if (!table[cmd]) fail(t('unknownCmd', cmd));
   table[cmd](rest);

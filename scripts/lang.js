@@ -12,14 +12,16 @@ const path = require('path');
 
 function norm(s) { return /^zh/i.test(String(s).trim()) ? 'zh' : 'en'; }
 
-function detectLang(argv) {
+function detectLang(argv, projectDir) {
   const a = argv || process.argv.slice(2);
   for (let i = 0; i < a.length; i++) {
     if (a[i] === '--lang' && a[i + 1]) return norm(a[i + 1]);
     const m = /^--lang=(.+)$/.exec(a[i]);
     if (m) return norm(m[1]);
   }
-  let dir = process.cwd();
+  const explicitRoot = projectDir || a.find(arg => arg.startsWith('--root='))?.slice(7)
+    || (a.includes('--root') && a[a.indexOf('--root') + 1]);
+  let dir = explicitRoot ? path.resolve(explicitRoot) : process.cwd();
   for (let up = 0; up < 8; up++) {
     const p = path.join(dir, 'keeper-profile.json');
     if (fs.existsSync(p)) {
@@ -30,7 +32,7 @@ function detectLang(argv) {
       break;
     }
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (explicitRoot || parent === dir) break;
     dir = parent;
   }
   return 'en';

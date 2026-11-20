@@ -84,6 +84,16 @@ console.log('\nindie-keeper e2e exercise\n');
     // truth sections lists headings
     r = run(['truth', 'sections', 'docs/lore.md', `--root=${root}`]);
     ok('sections lists headings', r.code === 0 && /World/.test(r.out) && /Characters/.test(r.out));
+    const doc = '# Manual\n## First\n### Notes\noriginal one\n## Second\n### Notes\noriginal two\n';
+    write(root, 'manual.md', doc);
+    const update = ['truth', 'update', 'manual.md', '--section', 'Notes', '--root', root];
+    r = run([...update, '--content', 'replacement']);
+    ok('ambiguous headings fail without changing the file', r.code === 1 && fs.readFileSync(path.join(root, 'manual.md'), 'utf8') === doc, r.out);
+    write(root, 'body.txt', 'literal \\n in an example');
+    r = run([...update, '--parent', 'Second', '--file', 'body.txt']);
+    const edited = fs.readFileSync(path.join(root, 'manual.md'), 'utf8');
+    ok('scoped edit preserves its sibling and literal escapes', r.code === 0 && edited === doc.replace('original two', '\nliteral \\n in an example'), r.out);
+
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -273,7 +283,7 @@ console.log('\nindie-keeper e2e exercise\n');
     ok('refs exits 0', r.code === 0, r.out.trim());
     ok('refs finds current-fact mentions', /SKILL\.md/.test(r.out) && /AGENTS\.md/.test(r.out), r.out);
     ok('refs finds historical mentions', /PROGRESS\.md/.test(r.out) && /ROADMAP\.md/.test(r.out), r.out);
-    ok('refs classifies current vs historical', /current fact/i.test(r.out) && /historical narrative/i.test(r.out), r.out);
+    ok('refs classifies current vs historical', /historical narrative[^\n]*\n(?:(?!other mentions)[\s\S])*PROGRESS\.md/i.test(r.out), r.out);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -351,7 +361,7 @@ console.log('\nindie-keeper e2e exercise\n');
 
     const r = run(['stale', `--root=${root}`]);
     ok('stale exits non-zero on stale translations', r.code === 1, `exit=${r.code}`);
-    ok('stale reports stale translations', /translation.*stale|stale.*translation/i.test(r.out), r.out);
+    ok('stale reports stale translations', /AGENTS\.zh\.md: stale/.test(r.out), r.out);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -485,18 +495,284 @@ console.log('\nindie-keeper e2e exercise\n');
     ok('preflight commit with debug → still exit 0 (warning only)', r.code === 0, r.out);
     ok('preflight reports debug residue found', /debug residue\(s\) found/.test(r.out), r.out);
 
+    write(root, '脚本.js', 'const broken = ;\n');
+    spawnSync('git', ['add', '脚本.js'], { cwd: root, stdio: 'ignore' });
+    write(root, '脚本.js', 'const fixed = true;\n');
+    r = run(['release', 'preflight', 'commit', '--root', root]);
+    ok('syntax check reads staged Unicode paths even after a working-tree fix', r.code === 1 && r.out.includes('脚本.js'), r.out);
+    spawnSync('git', ['add', '脚本.js'], { cwd: root, stdio: 'ignore' });
+    write(root, '脚本.js', 'const broken = ;\n');
+    r = run(['release', 'preflight', 'commit', '--root', root]);
+    ok('unstaged syntax errors do not fail staged checks', r.code === 0, r.out);
+
+    write(root, 'notes.md', '# Notes\n');
+    write(root, 'locales/docs-manifest.json', JSON.stringify({
+      sourceLang: 'en', primaryLang: 'en', i18nDir: '', langs: ['en', 'zh'],
+      docs: [{ id: 'notes', source: 'notes.md', primary: 'notes.md' }],
+    }));
+    spawnSync('git', ['add', 'notes.md'], { cwd: root, stdio: 'ignore' });
+    r = run(['release', 'preflight', 'commit', '--root', root]);
+    ok('commit warns about missing translations in locales/', r.code === 0 && /translation check failed/.test(r.out), r.out);
+    r = run(['release', 'preflight', 'build', '--root', root]);
+    ok('build rejects missing translations', r.code === 1 && /translation check failed/.test(r.out), r.out);
+    write(root, 'notes.zh.md', '# 笔记');
+    run(['docs', 'stamp', 'notes', 'zh', '--root', root]);
+    r = run(['release', 'preflight', 'commit', '--lang', 'zh', '--root', root]);
+    ok('fresh translations pass in Chinese', r.code === 0 && /✓  翻译同步/.test(r.out), r.out);
+
     // 3. staged .env file → exit 1 (credential = blocking problem)
     write(root, '.env', 'SECRET=abc123\n');
     spawnSync('git', ['add', '.env'], { cwd: root, stdio: 'ignore' });
     r = run(['release', 'preflight', 'commit', `--root=${root}`]);
     ok('preflight commit with .env → exit 1', r.code === 1, r.out);
     ok('preflight reports credential file', /credential file/i.test(r.out), r.out);
+    spawnSync('git', ['reset', '--', '.env'], { cwd: root, stdio: 'ignore' });
+    write(root, 'package.json', JSON.stringify({ scripts: { test: 'node project-test.cjs' } }));
+    write(root, 'project-test.cjs', "require('fs').writeFileSync('ran-test', 'yes'); process.exit(3);");
+    r = run(['release', 'preflight', 'push', '--root', root]);
+    ok('push preflight runs the target project test and propagates failure', r.code === 1 && fs.existsSync(path.join(root, 'ran-test')) && /tests failed/.test(r.out), r.out);
+
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 })();
 
 // ────────────────────────────────────────────────────────────
+
+// A sibling project must never be read or modified through the caller's cwd.
+(function projectSelection() {
+  const tmp = mkTmpDir();
+  try {
+    const opts = { cwd: tmp };
+    const root = path.join(tmp, 'target project');
+    write(tmp, 'keeper-profile.json', '{"project":{"name":"Caller"}}');
+    write(root, 'keeper-profile.json', '{"project":{"name":"Target"},"language":"zh"}');
+    const progress = '# Progress\n### 2000-01-01\n\n- old\n';
+    const plan = '| P-1 | item | ⬜ |\n';
+    const start = '<!-- keeper:refresh:start progress -->old<!-- keeper:refresh:end -->\n';
+    for (const dir of [tmp, root]) {
+      write(dir, 'PROGRESS.md', progress);
+      write(dir, 'PLAN.md', plan);
+      write(dir, 'START-HERE.md', start);
+    }
+    for (const cmd of ['hello', 'status']) {
+      const r = run(['--root', 'target project', cmd], opts);
+      ok(cmd + ' reads target profile and language', r.code === 0 && /Target/.test(r.out) && /反馈/.test(r.out), r.out);
+    }
+    let r = run(['--lang', 'en', 'progress', 'add', 'entry', '--root', root], opts);
+    const updated = fs.readFileSync(path.join(root, 'PROGRESS.md'), 'utf8');
+    ok('progress writes only the requested entry in the target', r.code === 0 && /^- entry$/m.test(updated) && fs.readFileSync(path.join(tmp, 'PROGRESS.md'), 'utf8') === progress, r.out);
+    r = run(['plan', 'done', 'P-1', '--root=' + root], opts);
+    ok('plan updates only the requested project', r.code === 0 && fs.readFileSync(path.join(root, 'PLAN.md'), 'utf8').includes('✅') && fs.readFileSync(path.join(tmp, 'PLAN.md'), 'utf8') === plan);
+    r = run(['sync', '--check', '--root', root], opts);
+    ok('read-only sync preserves START-HERE', r.code === 0 && fs.readFileSync(path.join(root, 'START-HERE.md'), 'utf8') === start);
+    r = run(['start-here', 'refresh', '--root=' + root], opts);
+    ok('refresh reads target progress and preserves caller', r.code === 0 && fs.readFileSync(path.join(root, 'START-HERE.md'), 'utf8').includes('entry') && fs.readFileSync(path.join(tmp, 'START-HERE.md'), 'utf8') === start, r.out);
+    write(root, 'keeper-profile.json', '{"startHere":{"enabled":false}}');
+    write(root, 'START-HERE.md', start);
+    r = run(['sync', '--root', root], opts);
+    ok('sync respects the START-HERE opt-out', r.code === 0 && fs.readFileSync(path.join(root, 'START-HERE.md'), 'utf8') === start);
+    write(root, 'app/package.json', '{}');
+    write(root, 'feedback.json', '{"items":[{"id":7,"status":"idea"}]}');
+    r = run(['fb', 'add', 'test entry'], { cwd: path.join(root, 'app') });
+    const store = JSON.parse(fs.readFileSync(path.join(root, 'feedback.json'), 'utf8'));
+    ok('nested package uses project feedback and legacy IDs', r.code === 0 && store.items[1]?.id === 8 && store.nextId === 9, r.out);
+    write(root, 'docs/feedback/feedback.json', JSON.stringify({ nextId: 1, items: [{ id: 4, text: 'old', status: 'idea' }] }));
+    const feedback = ['--store', 'docs/feedback/feedback.json', '--root', root];
+    r = run(['fb', 'add', 'new', ...feedback], opts);
+    ok('lagging feedback counter cannot reuse a stored ID', r.code === 0 && r.out.includes('#5'), r.out);
+    r = run(['fb', 'link', '5', '--to', 'Plan@PLAN.md#tasks', ...feedback], opts);
+    const inbox = fs.readFileSync(path.join(root, 'docs/feedback/INBOX.md'), 'utf8');
+    ok('generated feedback links resolve from their Markdown page', r.code === 0 && inbox.includes('[Plan](../../PLAN.md#tasks)'), r.out);
+    r = run(['progress', 'add', 'unexpected', '--root'], opts);
+    ok('missing root value fails before editing', r.code === 1 && fs.readFileSync(path.join(tmp, 'PROGRESS.md'), 'utf8') === progress);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+})();
+
+(function strictChecks() {
+  const root = mkTmpDir();
+  try {
+    const check = (...args) => run([...args, '--root', root]);
+    write(root, 'keeper-profile.json', '{"language":"zh"}');
+    write(root, 'locales/docs-manifest.json', JSON.stringify({
+      sourceLang: 'en', primaryLang: 'en', i18nDir: '', langs: ['en', 'zh', 'ja'],
+      docs: [{ id: 'help', primary: 'help.md', source: 'help.md' }],
+    }));
+    write(root, 'help.md', '# Help');
+    write(root, 'help.zh.md', '# 帮助');
+    let r = check('docs', 'stamp', 'help', '--lang', 'zh');
+    ok('stamp accepts the target-language flag', r.code === 0, r.out);
+    write(root, 'help.ja.md', '# Help (ja)');
+    r = check('docs', 'stamp', 'help', '--lang', 'zh');
+    const state = fs.readFileSync(path.join(root, 'locales/docs-state.json'), 'utf8');
+    ok('targeted stamp leaves other languages unstamped', r.code === 0 && !state.includes('help:ja'));
+    ok('bulk check accepts a positional language filter', check('docs', 'stamp', '--all', 'zh', '--check').code === 0);
+    ok('unknown stamp language is rejected', check('docs', 'stamp', 'help', '--lang', 'xx').code === 1);
+    fs.unlinkSync(path.join(root, 'help.ja.md'));
+    for (const args of [['docs', 'stamp', '--all', '--check'], ['stale'], ['sync']]) {
+      r = check(...args);
+      ok(args.join(' ') + ' rejects a missing translation', r.code === 1 && r.out.includes('help.ja.md'), r.out);
+    }
+    ok('checking leaves fingerprints intact', fs.readFileSync(path.join(root, 'locales/docs-state.json'), 'utf8') === state);
+    fs.unlinkSync(path.join(root, 'help.md'));
+    ok('check rejects a missing source', check('docs', 'stamp', '--all', '--check').code === 1);
+    write(root, '.docs/truth-source.json', '{"topics":{"rules":{"file":"missing.md"}}}');
+    r = check('stale');
+    ok('Chinese archive failures reach stale output', r.code === 1 && /死链/.test(r.out) && r.out.includes('missing.md'), r.out);
+    write(root, 'locales/docs-manifest.json', '{');
+    r = check('sync');
+    ok('malformed registry fails the sweep', r.code === 1 && /docs.*发现问题/.test(r.out), r.out);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+})();
+
+(function versionPatterns() {
+  const root = mkTmpDir();
+  try {
+    const targets = [
+      { file: 'app.txt', patterns: ['build {{code}} = {{version}}'] },
+      { file: 'other.txt', patterns: ['version {{version}}'] },
+    ];
+    write(root, 'version-manifest.json', JSON.stringify({ targets }));
+    write(root, 'app.txt', 'build 10203 = 1.2.3');
+    write(root, 'other.txt', 'old format');
+    const set = () => run(['ver', 'set', '1.2.4', '--root', root]);
+    let r = set();
+    ok('later pattern failure leaves the first file untouched', r.code === 1 && fs.readFileSync(path.join(root, 'app.txt'), 'utf8') === 'build 10203 = 1.2.3', r.out);
+    write(root, 'other.txt', 'version 1.2.3');
+    ok('check accepts build code before version', run(['ver', 'check', '--root', root]).code === 0);
+    r = set();
+    ok('set updates both files after validation', r.code === 0 && fs.readFileSync(path.join(root, 'app.txt'), 'utf8') === 'build 10204 = 1.2.4', r.out);
+    write(root, 'app.txt', 'build 1 = 1.2.4');
+    ok('mismatched build code fails version check', run(['ver', 'check', '--root', root]).code === 1);
+
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+})();
+
+// A small terminal adapter varies only the stream capabilities; the actual entry point runs.
+(function bannerOutput() {
+  const root = mkTmpDir();
+  try {
+    write(root, 'keeper-profile.json', '{"project":{"name":"Orbit Orchard"}}');
+    write(root, 'game-i18n-manifest.json', '{"sourceLang":"en","langs":["zh"],"scan":{"dirs":["src"],"exts":[".gd"]}}');
+    write(root, 'src/sample.gd', 'extends Node\n');
+    const render = (width, env = {}, args = ['help']) => {
+      const adapter = 'Object.defineProperties(process.stdout, {isTTY:{value:true},columns:{value:' + width + '}});' +
+        'require(process.argv[1]);';
+      const p = spawnSync(NODE, ['-e', adapter, KEEPER, ...args, '--root', root], {
+        encoding: 'utf8', env: { ...process.env, TERM: 'xterm', NO_COLOR: '', CI: '', ...env },
+      });
+      if (p.status !== 0) throw Error(p.stderr);
+      return p.stdout;
+    };
+    const wide = render(80);
+    ok('wide terminal draws an ASCII wordmark', /\x1b\[36m[\x20-\x7e\r\n]+\x1b\[0m/.test(wide));
+    for (const [label, width, env] of [['narrow', 36, {}], ['no color', 80, { NO_COLOR: '1' }],
+      ['dumb', 80, { TERM: 'dumb' }], ['tiny', 7, {}]]) {
+      const out = render(width, env);
+      const line = out.split(/\r?\n/)[0];
+      ok(label + ' gets a width-safe plain ASCII mark', line.startsWith('[o_o]') && line.length <= width && !out.includes('\x1b'));
+    }
+    const art = /\[o_o\]|\[o o\]|\x1b/;
+    ok('redirected help omits artwork', !art.test(run(['help', '--root', root]).out));
+    ok('CI terminal omits artwork', !art.test(render(80, { CI: 'true' })));
+    const report = JSON.parse(render(80, {}, ['game', 'scan', '--json']));
+    ok('machine output parses as JSON in a terminal', report.files === 1 && report.hits.length === 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+})();
+
+(function formalAcceptance() {
+  console.log('Formal Sprint acceptance');
+  const root = mkTmpDir();
+  const sprint = (...args) => run(['sprint', ...args, '--lang', 'en'], { cwd: root });
+  const digest = s => require('crypto').createHash('sha256').update(s).digest('hex');
+  const record = 'evidence/run.json';
+  const file = (name, contents) => {
+    write(root, 'evidence/' + name, contents);
+    return { file: name, sha256: digest(contents) };
+  };
+  try {
+    const git = (...args) => {
+      const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+      if (r.status !== 0) throw Error(r.stderr);
+      return r.stdout.trim();
+    };
+    git('init', '-q');
+    write(root, 'game.txt', 'independent test fixture');
+    git('add', 'game.txt');
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'test: initial game');
+    const commit = git('rev-parse', 'HEAD');
+    sprint('new', 'Sample');
+    ok('formal task needs declared scope and source', sprint('add', 'missing', '--formal').code === 1);
+    sprint('add', 'Window smoke', '--formal', '--covers', 'headless,window', '--human-review', '--from', 'issue 3', '--accept', 'Window shows count after click');
+    const approve = () => sprint('approve', '1.1', '--record', record, '--by', 'human:claimed');
+    ok('claimed human identity alone cannot accept a formal item', sprint('approve', '1.1', '--by', 'human:claimed').code === 1);
+    const logic = { result: 'passed', ...file('logic.log', 'assert count=1') };
+    const window = { result: 'passed', ...file('window.log', 'sample window observation') };
+    const report = { commit, run: 'fixture-1', command: 'sample game test', coverage: { headless: logic } };
+    const save = () => write(root, record, JSON.stringify(report));
+    save();
+    ok('headless coverage cannot satisfy missing window case', /window/.test(approve().out) && approve().code === 1);
+    report.coverage.window = window;
+    report.commit = '0'.repeat(40);
+    save();
+    ok('unknown commit rejected', /commit SHA/.test(approve().out));
+    report.commit = commit;
+    save();
+    ok('human-required case needs separate decision receipt', /decision receipt/.test(approve().out));
+    report.review = window;
+    save();
+    ok('run artifact cannot double as a decision receipt', approve().code === 1);
+    report.review = file('decision.txt', 'Fixture decision, recorded separately');
+    window.result = 'failed';
+    save();
+    ok('failed result cannot be accepted', approve().code === 1);
+    window.result = 'passed';
+    save();
+    ok('formal acceptance attaches a real commit, record and scope', approve().code === 0 && sprint('show').out.includes(commit));
+    ok('human label is reported as recorder', sprint('show').out.includes('reported by human:claimed'));
+    file('window.log', 'changed');
+    ok('changed artifact blocks lint and archive', sprint('lint').code === 1 && sprint('close').code === 1);
+    file('window.log', 'sample window observation');
+    report.run = 'different-run';
+    save();
+    ok('same artifacts do not authorize replacing the approved report', /digest/.test(sprint('lint').out));
+    report.run = 'fixture-1';
+    save();
+    sprint('add', 'Small edit', '--accept', 'Text appears');
+    ok('small task keeps lightweight self-check', sprint('approve', '1.2').code === 0 && sprint('show').out.includes('reported by self'));
+    ok('exact original evidence can be linted and archived', sprint('lint').code === 0 && sprint('close').code === 0);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+})();
+
+(function handoffBoard() {
+  const root = mkTmpDir();
+  try {
+    const hello = lang => run(['hello', '--root', root, '--lang', lang], { cwd: root }).out;
+    write(root, 'HANDOFF.md', '# Legacy\nRead the previous shift.\n');
+    ok('legacy root handoff remains discoverable', hello('en').includes('HANDOFF.md'));
+    write(root, 'docs/PLAN.md', '# Plan\nPending decision on release scope.\n');
+    write(root, 'docs/HANDOFF.md', [
+      '# Handoff', '## Handoff brief', '- Next: Run smoke', '- Why: Confirm HUD',
+      '- Decision: issue 3', '- Evidence: evidence/run.json', '## History', '- Next: OBSOLETE',
+    ].join('\r\n'));
+    const board = hello('en');
+    ok('hello shows action, why, source and evidence from the preferred handoff', [
+      'docs/HANDOFF.md', 'Run smoke', 'Confirm HUD', 'issue 3', 'evidence/run.json',
+    ].every(s => board.includes(s)) && !board.includes('OBSOLETE'));
+    ok('empty plan table does not claim all work is done', board.includes('no pending numbered plan rows'));
+    write(root, 'docs/HANDOFF.md', '## 接班要点\n- 下一步：核对候选\n- 证据：测试报告\n## 旧班次\n- 原因：过时记录\n');
+    const zh = hello('zh');
+    ok('Chinese brief excludes historical sections', zh.includes('下一步：核对候选') && zh.includes('证据：测试报告') && !zh.includes('过时记录'));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+})();
 
 console.log(`\n${pass} passed · ${fail} failed`);
 if (fail) {

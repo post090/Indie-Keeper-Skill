@@ -5,7 +5,7 @@ name: keeper-checks
 # These checks catch the regressions the audit found:
 #   - script syntax errors (node --check)
 #   - truth-source dead links / untracked docs (keeper truth check)
-#   - stale translations / manifest drift (keeper docs status)
+#   - stale translations / missing / unfinished translations (keeper docs stamp --all --check)
 #   - schedule.json consistency (keeper schedule check)
 # If any check exits non-zero, the workflow fails and blocks the PR.
 
@@ -37,8 +37,7 @@ jobs:
           exit $fail
 
       - name: Archive checkup (truth check)
-        # truth-source.json lives in the internal working tree only —
-        # the public snapshot ships without it, so skip when absent.
+        # Run the archive check when a registry is present.
         run: |
           if [ -f docs/truth-source.json ] || [ -f truth-source.json ]; then
             node scripts/keeper.js truth check
@@ -46,11 +45,11 @@ jobs:
             echo "no truth-source.json in this tree — skipped"
           fi
 
-      - name: Docs i18n status (translation sync)
-        run: node scripts/keeper.js docs status
+      - name: Docs translation check
+        run: node scripts/keeper.js docs stamp --all --check
 
       - name: Schedule consistency
-        # schedule.json is internal state — skip when absent (public snapshot).
+        # Run the schedule check when a registry is present.
         run: |
           if [ -f docs/schedule.json ] || [ -f schedule.json ]; then
             node scripts/keeper.js schedule check

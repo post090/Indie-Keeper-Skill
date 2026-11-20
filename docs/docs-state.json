@@ -1,27 +1,27 @@
 {
   "readme:zh": {
-    "srcHash": "effb159d8a4e",
-    "stampedAt": "2026-07-29 08:42"
+    "srcHash": "ec07e55177a4",
+    "stampedAt": "2026-11-20 02:58"
   },
   "skill:zh": {
-    "srcHash": "8e313cf3a117",
-    "stampedAt": "2026-07-28 18:19"
+    "srcHash": "04478d567be0",
+    "stampedAt": "2026-11-20 04:24"
   },
   "cli:zh": {
-    "srcHash": "bd6e68a588d9",
-    "stampedAt": "2026-07-29 10:20"
+    "srcHash": "aea1b8430608",
+    "stampedAt": "2026-11-20 04:24"
   },
   "onboarding:zh": {
-    "srcHash": "d21031d08a88",
-    "stampedAt": "2026-07-29 09:32"
+    "srcHash": "fe79260ada2c",
+    "stampedAt": "2026-11-20 04:24"
   },
   "game-docs-menu:zh": {
     "srcHash": "f5a605a7db31",
     "stampedAt": "2026-07-28 11:42"
   },
   "room-archive:zh": {
-    "srcHash": "8569af95a544",
-    "stampedAt": "2026-07-28 11:25"
+    "srcHash": "d03500c17e4e",
+    "stampedAt": "2026-11-20 01:14"
   },
   "room-feedback:zh": {
     "srcHash": "976f4c108c77",
@@ -36,15 +36,15 @@
     "stampedAt": "2026-07-28 16:37"
   },
   "room-shipping:zh": {
-    "srcHash": "ec5706702267",
-    "stampedAt": "2026-07-29 09:32"
+    "srcHash": "10bd01461b7d",
+    "stampedAt": "2026-11-20 04:23"
   },
   "room-i18n:zh": {
-    "srcHash": "fc79be643fce",
-    "stampedAt": "2026-07-28 10:57"
+    "srcHash": "30cf1ce59c0c",
+    "stampedAt": "2026-11-20 01:14"
   },
   "room-schedule:zh": {
-    "srcHash": "a458295d41a7",
-    "stampedAt": "2026-07-28 17:28"
+    "srcHash": "87f51c806c10",
+    "stampedAt": "2026-11-20 01:14"
   }
 }

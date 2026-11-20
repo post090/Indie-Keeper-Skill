@@ -26,7 +26,7 @@
       "milestone": "2026-08-15",
       "items": [
         {
-          "id": "0.1.1",
+          "id": "v0.1.1",
           "title": "玩家移动",
           "estimate": 3,
           "start": "2026-08-01",
@@ -44,8 +44,8 @@
 字段说明：
 - `version.status`：`planned`（计划中）/ `in-progress`（进行中）/ `shipped`（已发）/ `paused`（搁置）
 - `item.status`：`todo`（待办）/ `doing`（施工中）/ `done`（完成）/ `blocked`（卡住）/ `dropped`（撤掉）
-- `estimate`：天数（整数）。瞎猜也比没有强——0.1.1 是 3 天还是 30 天，计划完全不一样
-- `dependsOn`：同版本内兄弟条目的 id 列表。甘特图会用箭头连线；`check` 会抓悬空引用
+- `estimate`：天数（整数）。瞎猜也比没有强——v0.1.1 是 3 天还是 30 天，计划完全不一样
+- `dependsOn`：同版本内兄弟条目的 id 列表。甘特图的任务详情列出依赖，`check` 检查悬空引用
 - `confidence`：`high` / `low`。甘特图把 `low` 的任务条画成虚线轮廓，让人一眼看到不确定性
 - `milestone`：版本目标发布日期。滑了就老实改日期，让甘特图重渲染，绝不让计划撒谎
 
@@ -53,13 +53,14 @@
 
 ```bash
 node schedule.js init                                       # 创建空的 schedule.json
+# 按上方 JSON 结构在 versions 中登记 v0.1，items 初始为空。
 node schedule.js add "玩家移动" --version v0.1 --estimate 3 --start 2026-08-01 --due 2026-08-04
-node schedule.js add "摄像机跟随" --version v0.1 --estimate 2 --depends 0.1.1 --confidence low
+node schedule.js add "摄像机跟随" --version v0.1 --estimate 2 --depends v0.1.1 --confidence low
 node schedule.js list --version v0.1
-node schedule.js bump 0.1.1 --status doing
-node schedule.js edit 0.1.1 --estimate 5                    # 现实变了——更新工期
-node schedule.js done 0.1.1
-node schedule.js drop 0.1.3                                 # 撤掉这条，原因留在 title 里
+node schedule.js bump v0.1.1 --status doing
+node schedule.js edit v0.1.1 --estimate 5                    # 现实变了——更新工期
+node schedule.js done v0.1.1
+node schedule.js drop v0.1.2                                 # 撤掉这条，原因留在 title 里
 ```
 
 条目 id 按版本自动分配（`<版本id>.<序号>`），`add` 不用自己造。
@@ -69,7 +70,7 @@ node schedule.js drop 0.1.3                                 # 撤掉这条，原
 `keeper site serve` 把 schedule 渲染成 ROADMAP 页面内的可交互甘特图（不是盖住整页的独立视图——是同页内的可展开 section）：
 
 - **任务条**可点击 → 弹详情卡片，含 sprint 文档跳转链接
-- **依赖关系**用箭头连线
+- **依赖关系**可在任务详情中查看
 - **置信度**：`low` 的任务条画成虚线轮廓，瞎猜的工期一眼可见
 - **缩放控件**：+/- / 还原 / 全宽
 - **`keeper schedule gantt --out schedule.svg`** 导出独立 SVG，离线分享用

@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 // e2e.js exercises whole CLI flows; this file pins down the pure logic that
 // several rooms share — the kind where a subtle regex bug breaks many
-// commands at once (fb #4):
+// commands at once:
 //   - parseConventionalCommits  (version-sync: bump level inference)
 //   - compile / parseSemver     (version-sync: placeholder pattern matching)
 //   - scanDebugResidue / scanCredentials  (release: preflight classification)
@@ -62,6 +62,9 @@ console.log('\nindie-keeper unit tests\n');
 
   r = p('refactor: rework loader\nBREAKING CHANGE: manifest schema v2\n');
   ok('BREAKING CHANGE in body → major', r.level === 'major' && r.breaking === 1, JSON.stringify(r));
+
+  r = p('fix: first\nmulti-paragraph body\n\nBREAKING CHANGE: new schema\n\0\nfeat: second\n\0');
+  ok('git record boundaries preserve breaking footers and the next subject', r.breaking === 1 && r.feat === 1 && r.other === 0);
 
   r = p('update stuff\n');
   ok('non-conventional subject → other, patch', r.level === 'patch' && r.other === 1, JSON.stringify(r));
@@ -152,7 +155,7 @@ console.log('\nindie-keeper unit tests\n');
   ok('second cut works on the fresh Unreleased', !!twice && twice.content.includes('## [0.3.0] - 2026-08-01') && twice.hasBullets === false);
 })();
 
-// ── draftFromLog / applyDraft (changelog draft, fb #5) ──────
+// ── draftFromLog / applyDraft (changelog draft) ──────
 (function suiteDraft() {
   console.log('Suite 5 · draftFromLog / applyDraft (changelog draft)');
 
@@ -188,7 +191,7 @@ console.log('\nindie-keeper unit tests\n');
   ok('draft entries survive changelog cut', !!cut && cut.hasBullets === true && cut.content.indexOf('## [0.2.0]') < cut.content.indexOf('- zoom controls'));
 })();
 
-// ── slugify / validateBranchName (branch policy, fb #6) ────
+// ── slugify / validateBranchName (branch policy) ────
 (function suiteBranch() {
   console.log('Suite 6 · slugify / validateBranchName (branch policy)');
 

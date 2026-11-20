@@ -47,9 +47,11 @@ function flag(name, dflt) { return name in A.flags ? A.flags[name] : dflt; }
 
 const ROOT = path.resolve(flag('root', process.cwd()));
 const SCRIPTS_DIR = __dirname;
+const projectFiles = require('../project-files');
 const lang = detectLang();
 
 const MSG = {
+  localOnly: { en: 'Branch "{0}" is local-only in this project. Push preflight blocked.', zh: '本项目的 "{0}" 分支仅限本地。推送预检已阻断。' },
   help: {
     en: `release.js · Shipping Dock release pipeline (preflight + changelog + platform guides)
 
@@ -135,6 +137,8 @@ const MSG = {
   preflightCredOk: { en: '  ✓  no credential files in staging', zh: '  ✓  暂存区没有凭证文件' },
 
   // ── preflight: syntax ──
+  preflightIndexFail: { en: 'Could not list staged files', zh: '读取暂存区文件清单失败' },
+  preflightBlobFail: { en: 'Could not read staged file {0}', zh: '读取暂存文件 {0} 失败' },
   preflightSyntaxHead: { en: '  ▸  syntax check (node --check)', zh: '  ▸  语法检查（node --check）' },
   preflightSyntaxFail: { en: '  ❌ {0} file(s) failed syntax check', zh: '  ❌ {0} 个文件语法检查失败' },
   preflightSyntaxOk: { en: '  ✓  {0} file(s) passed', zh: '  ✓  {0} 个文件通过' },
@@ -142,7 +146,7 @@ const MSG = {
 
   // ── preflight: docs sync ──
   preflightDocsHead: { en: '  ▸  docs translation sync', zh: '  ▸  文档翻译同步' },
-  preflightDocsStale: { en: '  ⚠️  translations stale — run `keeper docs status` for details', zh: '  ⚠️  翻译过期——跑 `keeper docs status` 看详情' },
+  preflightDocsStale: { en: '  ⚠️  translation check failed — run `keeper docs stamp --all --check` for details', zh: '  ⚠️  翻译检查失败，请运行 `keeper docs stamp --all --check` 查看详情' },
   preflightDocsOk: { en: '  ✓  translations fresh', zh: '  ✓  翻译同步' },
   preflightDocsSkip: { en: '  =  no docs-manifest.json (Docs Translation Desk not installed)', zh: '  =  没有 docs-manifest.json（文档翻译部未安装）' },
   preflightNoDocChanges: { en: '  =  no .md files in staging', zh: '  =  暂存区没有 .md 文件' },
@@ -158,9 +162,10 @@ const MSG = {
   preflightTestFail: { en: '  ❌ tests failed', zh: '  ❌ 测试失败' },
   preflightTestOk: { en: '  ✓  tests passed', zh: '  ✓  测试通过' },
   preflightTestSkip: { en: '  =  no test script in package.json', zh: '  =  package.json 里没有 test 脚本' },
+  preflightFetchFail: { en: '  ⚠ remote fetch failed; upstream status is unknown', zh: '  ⚠ 拉取远端信息失败，上游状态未知' },
   preflightBehindHead: { en: '  ▸  remote sync', zh: '  ▸  远程同步' },
-  preflightBehind: { en: '  ⚠️  local is behind origin by {0} commit(s) — pull first', zh: '  ⚠️  本地落后 origin {0} 个 commit——先 pull' },
-  preflightAhead: { en: '  ✓  local is ahead of origin by {0} commit(s) — safe to push', zh: '  ✓  本地领先 origin {0} 个 commit——可以推' },
+  preflightBehind: { en: '  ⚠️  local is behind its upstream by {0} commit(s)', zh: '  ⚠️  本地落后上游 {0} 个提交' },
+  preflightAhead: { en: '  ✓  local is ahead of its upstream by {0} commit(s)', zh: '  ✓  本地领先上游 {0} 个提交' },
   preflightUpToDate: { en: '  =  local is up to date with origin — nothing to push', zh: '  =  本地跟 origin 一致——没东西可推' },
   preflightNoRemote: { en: '  =  no remote configured', zh: '  =  没配置远程' },
   preflightBranchHead: { en: '  ▸  branch check', zh: '  ▸  分支检查' },
@@ -170,7 +175,7 @@ const MSG = {
   preflightProgressStale: { en: '  ⚠️  last PROGRESS.md entry is {0} day(s) old — log before pushing', zh: '  ⚠️  PROGRESS.md 上一条是 {0} 天前的——推之前记一笔' },
   preflightProgressOk: { en: '  ✓  PROGRESS.md recent', zh: '  ✓  PROGRESS.md 是最近的' },
   preflightProgressSkip: { en: '  =  no PROGRESS.md', zh: '  =  没有 PROGRESS.md' },
-  preflightSyncHead: { en: '  ▸  keeper sync (derived content + all checks)', zh: '  ▸  keeper sync（派生内容 + 所有检查）' },
+  preflightSyncHead: { en: '  ▸  keeper sync --check', zh: '  ▸  keeper sync --check' },
   preflightSyncFail: { en: '  ❌ keeper sync found problems — run `keeper sync` for details', zh: '  ❌ keeper sync 发现问题——跑 `keeper sync` 看详情' },
   preflightSyncOk: { en: '  ✓  keeper sync all green', zh: '  ✓  keeper sync 全绿' },
 
@@ -228,10 +233,10 @@ function fail(msg) { console.error(`✗ ${msg}`); process.exit(1); }
 
 // ── helpers ──
 
-function git(args, cwd) {
+function git(args, cwd, raw = false) {
   try {
-    const r = spawnSync('git', args, { cwd: cwd || ROOT, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-    return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+    const r = spawnSync('git', args, { cwd: cwd || ROOT, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    return { ok: r.status === 0, out: raw ? (r.stdout || '') : (r.stdout || '').trim(), err: (r.stderr || '').trim() };
   } catch { return { ok: false, out: '', err: '' }; }
 }
 
@@ -259,9 +264,15 @@ function hasFile(rel) { return fs.existsSync(path.join(ROOT, rel)); }
 
 // staged source files (added/copied/modified), excluding deletions
 function stagedFiles() {
-  const r = git(['diff', '--cached', '--name-only', '--diff-filter=ACM']);
-  if (!r.ok || !r.out.trim()) return [];
-  return r.out.split('\n').filter(Boolean);
+  const r = git(['diff', '--cached', '--no-relative', '--no-renames', '--name-only', '-z', '--diff-filter=ACMT'], ROOT, true);
+  if (!r.ok) fail(t('preflightIndexFail'));
+  return r.out.split('\0').filter(Boolean);
+}
+
+function stagedText(rel) {
+  const r = git(['show', ':' + rel], ROOT, true);
+  if (!r.ok) fail(t('preflightBlobFail', rel));
+  return r.out;
 }
 
 // scan staged source files for debug residue (console.log / debugger / print / TODO)
@@ -275,14 +286,13 @@ const DEBUG_PATTERNS = [
 const SOURCE_EXTS = new Set(['.js', '.ts', '.jsx', '.tsx', '.py', '.mjs', '.cjs']);
 const TEST_PATTERNS = [/\.test\./, /\.spec\./, /__tests__\//, /(^|\/)tests?\//];
 
-function scanDebugResidue(files) {
+function scanDebugResidue(files, readSource = rel => fs.readFileSync(path.join(ROOT, rel), 'utf8')) {
   const hits = [];
   for (const rel of files) {
     const ext = path.extname(rel);
     if (!SOURCE_EXTS.has(ext)) continue;
     if (TEST_PATTERNS.some(re => re.test(rel))) continue;
-    const abs = path.join(ROOT, rel);
-    let text; try { text = fs.readFileSync(abs, 'utf8').replace(/\r\n?/g, '\n'); } catch { continue; }
+    const text = readSource(rel).replace(/\r\n?/g, '\n');
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
       for (const { re, label } of DEBUG_PATTERNS) {
@@ -313,8 +323,21 @@ function syntaxCheck(files) {
   const errors = [];
   const jsFiles = files.filter(f => f.endsWith('.js'));
   for (const rel of jsFiles) {
-    const abs = path.join(ROOT, rel);
-    const r = spawnSync(process.execPath, ['--check', abs], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+    // Stdin keeps the index bytes intact. Use the nearest staged package's module mode.
+    let dir = path.posix.dirname(rel);
+    let type;
+    while (true) {
+      const pkg = git(['show', ':' + path.posix.join(dir, 'package.json')]);
+      if (pkg.ok) {
+        try { type = JSON.parse(pkg.out).type; } catch { errors.push(path.posix.join(dir, 'package.json')); }
+        break;
+      }
+      if (dir === '.') break;
+      dir = path.posix.dirname(dir);
+    }
+    const args = ['--check'];
+    if (type === 'module' || type === 'commonjs') args.push('--input-type=' + type);
+    const r = spawnSync(process.execPath, [...args, '-'], { input: stagedText(rel), encoding: 'utf8', cwd: ROOT });
     if (r.status !== 0) {
       const msg = (r.stderr || '').trim().split('\n')[0];
       errors.push(`${rel}: ${msg}`);
@@ -325,12 +348,12 @@ function syntaxCheck(files) {
 
 // check if docs-manifest.json exists (Docs Translation Desk installed)
 function hasDocsManifest() {
-  return hasFile('docs/docs-manifest.json') || hasFile('docs-manifest.json') || hasFile('.docs/docs-manifest.json');
+  return projectFiles.docs.some(hasFile);
 }
 
 // check if truth-source.json exists (Archive installed)
 function hasTruthSource() {
-  return hasFile('docs/truth-source.json') || hasFile('truth-source.json') || hasFile('.docs/truth-source.json');
+  return projectFiles.truth.some(hasFile);
 }
 
 // check if version-manifest.json exists (version sync installed)
@@ -370,7 +393,6 @@ function lastProgressDate() {
 
 function preflightCommit() {
   let problems = 0, warnings = 0;
-  const files = stagedFiles();
 
   // 1. git status overview
   const st = git(['status', '--short']);
@@ -379,11 +401,12 @@ function preflightCommit() {
   if (dirty.length === 0) { console.log(t('preflightWorktreeClean')); }
   else { console.log(t('preflightWorktreeDirty', dirty.length)); for (const l of dirty.slice(0, 8)) console.log(`    ${l}`); }
 
+  const files = stagedFiles();
   if (files.length === 0) { console.log(t('preflightNoStaged')); return { problems, warnings }; }
 
   // 2. debug residue
   console.log(t('preflightDebugHead'));
-  const debugHits = scanDebugResidue(files);
+  const debugHits = scanDebugResidue(files, stagedText);
   if (debugHits.length) { console.log(t('preflightDebugFound', debugHits.length)); for (const h of debugHits.slice(0, 10)) console.log(`    ${h}`); warnings += debugHits.length; }
   else console.log(t('preflightDebugOk'));
 
@@ -408,9 +431,8 @@ function preflightCommit() {
     console.log(t('preflightDocsHead'));
     if (!hasDocsManifest()) console.log(t('preflightDocsSkip'));
     else {
-      const r = runKeeper('docs-i18n.js', ['status']);
-      const stale = /needing work|待更新/.test(r.out) && !/0\s+needing work|0\s+待更新/.test(r.out);
-      if (stale) { console.log(t('preflightDocsStale')); warnings++; }
+      const r = runKeeper('docs-i18n.js', ['stamp', '--all', '--check']);
+      if (!r.ok) { console.log(t('preflightDocsStale')); warnings++; }
       else console.log(t('preflightDocsOk'));
     }
   }
@@ -430,6 +452,14 @@ function preflightCommit() {
 // ── preflight: push ──
 
 function preflightPush() {
+  const localOnly = loadProfile()?.repo?.localOnlyBranches;
+  if (Array.isArray(localOnly)) {
+    const branch = git(['symbolic-ref', '--quiet', '--short', 'HEAD']);
+    if (!branch.ok || localOnly.includes(branch.out)) {
+      console.error(t('localOnly', branch.out || 'HEAD'));
+      return { problems: 1, warnings: 0 };
+    }
+  }
   // run all commit checks first
   console.log(t('preflightHead', 'push (includes commit checks)'));
   let { problems, warnings } = preflightCommit();
@@ -438,13 +468,10 @@ function preflightPush() {
   console.log(t('preflightTestHead'));
   const pkg = readJSON(path.join(ROOT, 'package.json'));
   if (pkg && pkg.scripts && pkg.scripts.test && !/no test specified/.test(pkg.scripts.test)) {
-    const r = spawnSync(process.execPath, [path.join(SCRIPTS_DIR, '..', 'tests', 'e2e.js')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-    // fall back to `npm test` if e2e doesn't exist
-    let result = r;
-    if (r.error || r.status === null) {
-      const nr = spawnSync('npm', ['test', '--silent'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-      result = nr;
-    }
+    // Run the project's declared test suite from the project root.
+    const windows = process.platform === 'win32';
+    const result = spawnSync(windows ? 'cmd.exe' : 'npm', windows ? ['/d', '/c', 'npm test --silent'] : ['test', '--silent'],
+      { cwd: ROOT, stdio: 'inherit' });
     if (result.status === 0) console.log(t('preflightTestOk'));
     else { console.log(t('preflightTestFail')); problems++; }
   } else {
@@ -455,8 +482,8 @@ function preflightPush() {
   console.log(t('preflightBehindHead'));
   const remote = git(['remote']);
   if (!remote.ok || !remote.out) { console.log(t('preflightNoRemote')); }
+  else if (!git(['fetch']).ok) { console.log(t('preflightFetchFail')); warnings++; }
   else {
-    git(['fetch']);
     const behind = git(['rev-list', '--count', '@{u}..HEAD']);
     const ahead = git(['rev-list', '--count', 'HEAD..@{u}']);
     if (behind.ok && ahead.ok) {
@@ -493,7 +520,7 @@ function preflightPush() {
   const keeper = path.join(SCRIPTS_DIR, '..', 'keeper.js');
   if (!fs.existsSync(keeper)) { console.log(t('preflightSyncSkip')); }
   else {
-    const r = spawnSync(process.execPath, [keeper, 'sync', `--root=${ROOT}`], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [keeper, 'sync', '--check', `--root=${ROOT}`], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
     if (r.status === 0) console.log(t('preflightSyncOk'));
     else { console.log(t('preflightSyncFail')); problems++; }
   }
@@ -522,9 +549,8 @@ function preflightBuild() {
   console.log(t('preflightDocsHead'));
   if (!hasDocsManifest()) { console.log(t('preflightDocsSkip')); }
   else {
-    const r = runKeeper('docs-i18n.js', ['status']);
-    const stale = /needing work|待更新/.test(r.out) && !/0\s+needing work|0\s+待更新/.test(r.out);
-    if (stale) { console.log(t('preflightDocsStale')); problems++; }
+    const r = runKeeper('docs-i18n.js', ['stamp', '--all', '--check']);
+    if (!r.ok) { console.log(t('preflightDocsStale')); problems++; }
     else console.log(t('preflightDocsOk'));
   }
 
@@ -935,7 +961,7 @@ function clAdd(args) {
   console.log(t('clAdded', text));
 }
 
-// ── changelog draft (fb #5) ──
+// ── changelog draft ──
 // Turn `git log <tag>..HEAD` subjects into Keep-a-Changelog buckets. The
 // mapping is deliberately conservative: docs/style/test/chore/ci/build are
 // noise for a player-facing changelog and get skipped (counted, not listed).

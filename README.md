@@ -60,7 +60,7 @@ The AI triages first, then acts — never applies a one-size-fits-all template.
 
 Either way, first use is **triage**, not an install wizard: the AI asks about your division of labor, platforms, and habits (each question comes with a suggestion and a recommended default), and the answers go into `keeper-profile.json`, after which every room works the way you like. Domains marked with authority in the division-of-labor table (e.g. "worldbuilding — your call") are organized and implemented only by the AI, **never improvised**. Existing doc structures in old projects go through "renovation": inventory and register first, no bulldozing.
 
-Once triaged, typing `keeper` puts it on duty — next to it is the house it looks after, and the name shown is **your game's own name**:
+After triage, type `keeper` in a terminal to see your game's name and the commands for starting a shift.
 
 ![keeper splash](assets/cli-menu.svg)
 
@@ -152,7 +152,7 @@ The precondition for governing docs is not breaking docs. [SKILL.md](SKILL.md) h
 |-----------|----------|
 | [SKILL.md](SKILL.md) | Master document: AI onboarding flow, room overview, safety red lines, code of conduct |
 | [references/](references/) | Per-room mechanism manuals + onboarding manual + CLI human manual + game-docs menu |
-| [scripts/](scripts/) | Zero-dependency Node reference implementation — `keeper.js` entry + `commands/` (one file per room) + `lib/` (shared helpers) |
+| [scripts/](scripts/) | Zero-dependency Node reference implementation — `keeper.js` entry + `commands/` (room commands), `lang.js` (UI language) and `project-files.js` (registry locations) |
 | [templates/](templates/) | Data file templates + game-design doc skeletons + UIUX-SPEC template |
 | [docs/](docs/) | Docs i18n manifest + translation fingerprints + Chinese root docs (`docs/zh/`) |
 

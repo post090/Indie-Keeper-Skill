@@ -5,6 +5,7 @@ This manual is for **humans** — what you type in the terminal when using keepe
 ## Install into your project
 
 1. Copy the entire `scripts/` folder into your project, suggested location `tools/keeper/`
+   For a project using `"type": "module"`, put `{"type":"commonjs"}` in `tools/keeper/package.json`.
 2. Register one line in `package.json`:
 
 ```json
@@ -13,13 +14,15 @@ This manual is for **humans** — what you type in the terminal when using keepe
 
 3. From now on it is `npm run keeper -- <command>`. If that is too long, configure a bin or shell alias so you can just type `keeper <command>`
 
-Typing `keeper` with no arguments shows the splash — a little robot housekeeper and the houses it looks after, with the title being **your game's name** (read from keeper-profile.json).
+From another directory, select the project with `keeper --root <path> hello`. Use `keeper sync --check` to run checks without refreshing the entry page.
+
+In an interactive terminal, `keeper`, `keeper help` and `keeper hello` show an ASCII housekeeper and your game's name from `keeper-profile.json`. Wide color terminals get the full wordmark. Narrow terminals, `NO_COLOR` and `TERM=dumb` use a compact monochrome mark. Redirected output, CI and JSON commands omit the artwork.
 
 ## The daily three
 
 | Command | When to type it |
 |---------|-----------------|
-| `keeper hello` | **Type this first every time you start work.** A 30-second shift handover: version, git status, open feedback, current sprint progress, truth-source registry count, ending with a cheat sheet of common commands |
+| `keeper hello` | **Type this first every time you start work.** A 30-second shift handover: package.json version (when present), git status, open feedback, current sprint progress, truth-source registry count, ending with a cheat sheet of common commands |
 | `keeper status` | When you want a quick glance at workspace health: git change details, feedback counts by state, sprint progress |
 | `keeper where <topic>` | "Which file is this setting written in?" — goes straight to the authoritative doc, no full-text search. e.g. `keeper where characters` |
 
@@ -29,8 +32,8 @@ These three are the habits validated as most useful across two previous projects
 
 The sprint manages "what to do this shift"; the handover note manages "how far we got, what the next shift should avoid". Conventional path: `docs/HANDOFF.md` (root `HANDOFF.md` also recognized).
 
-- Every time you start work, `keeper hello` reports whether the handover note exists — if it does, read it before touching anything
-- At the end of a shift, write "unfinished items / pitfalls hit / suggested route for the next shift" into `docs/HANDOFF.md`
+- `keeper hello` shows the handoff path. To surface the current decision, add a `## Handoff brief` section with four one-line bullets labelled `Next:`, `Why:`, `Decision:` and `Evidence:`. Cite a durable decision source and the tested commit, report or command. Older notes stay readable at the displayed path.
+- At shift end, refresh those four lines and record unfinished work and pitfalls below them. For a formal Sprint entry, use `sprint add --formal --covers …` and `sprint approve <id> --record …` as described in [Shipping Dock](room-shipping.md).
 - On sprint `close`, you are reminded to deal with the handover note: archive it into `docs/sprints/_archive/` or delete it
 
 The handover note is archived per shift, not kept as a long-term doc; for long-term records, use the source of truth or the sprint.
@@ -41,7 +44,7 @@ The handover note is archived per shift, not kept as a long-term doc; for long-t
 # Archive —— document order
 keeper truth list                # full truth-source registry
 keeper truth check               # checkup: dead links / untracked docs
-keeper truth section <file> <section>  # safely read a section
+keeper truth sections <file>      # list headings for a section update
 
 # Feedback Box —— feedback does not evaporate
 keeper fb add "jump feels floaty" --from playtest-group --tag balance
@@ -55,7 +58,7 @@ keeper site pack                 # pack into a single HTML, viewable by anyone
 
 # Docs Translation Desk —— translations do not go stale
 keeper docs status               # see which translations are stale at a glance
-keeper docs stamp <lang> <file>  # stamp after translating
+keeper docs stamp <docId> <lang>  # stamp after translating
 
 # Game Text Desk —— in-game text
 keeper game scan                 # how many hardcoded strings are not in the dictionary
@@ -94,7 +97,7 @@ Every command has `help`: `keeper truth help`, `keeper fb help`…
 
 Output defaults to English. For Chinese, two ways:
 
-- Ad-hoc: append `--lang zh` to any command
+- Use `--lang zh` for Chinese output. For `docs` and `game`, use `--ui-lang zh` for the interface and `--lang` for the target translation language.
 - Permanent: write `"language": "zh"` in keeper-profile.json
 
 ## Cannot find a command?

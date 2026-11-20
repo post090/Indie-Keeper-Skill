@@ -40,25 +40,25 @@ keeper-profile.json（项目档案 · 所有房间的行为都查它）
 
 1. **找档案**：检查项目根部是否有 `keeper-profile.json`。
    - **有** → 读取，按档案行事，不重复问已答过的问题。项目里装了 keeper 脚本时，先跑 `keeper hello` 接班速查（待办反馈/当前 sprint/git 状态一屏看完）。
-   - **没有** → 进入入驻问诊，读 [references/onboarding.md](../../references/onboarding.md) 执行。
+   - **没有** → 进入入驻问诊，读 [references/onboarding.zh.md](../../references/onboarding.zh.md) 执行。
 2. **判断模式**：
    - **从零装修**：项目还没有文档结构 → 按问诊结果建所需房间（只建用户要的）。
    - **旧房改造**：项目已有 docs/、README、AGENTS.md 等 → **先盘点现状**，把现有文档登记进真相源，只补缺的部分，不推倒重来。
 3. **落地方式**（问诊确认）：
-   - 把 `scripts/` 里的零依赖 Node 脚本拷进目标项目（建议 `tools/keeper/`），在 package.json 注册 `"keeper": "node tools/keeper/keeper.js"`——之后全项目一个门牌：`keeper hello` 接班速查、`keeper truth where 角色`、`keeper game scan`（keeper.js 是统一入口，自带 hello/status/where 三个日常命令，其余转发；各房间脚本也能单独跑；人类手册见 [references/cli.md](../../references/cli.md)）；
+   - 把 `scripts/` 里的零依赖 Node 脚本拷进目标项目（建议 `tools/keeper/`），在 package.json 注册 `"keeper": "node tools/keeper/keeper.js"`——之后全项目一个门牌：`keeper hello` 接班速查、`keeper truth where 角色`、`keeper game scan`（keeper.js 是统一入口，自带 hello/status/where 三个日常命令，其余转发；各房间脚本也能单独跑；人类手册见 [references/cli.zh.md](../../references/cli.zh.md)）。脚本用的是 CommonJS（`require`）。若目标项目 package.json 里有 `"type": "module"`，需在 `tools/keeper/` 下放一个仅含 `{"type": "commonjs"}` 的小 package.json，让 Node 按最近 package.json 把 keeper 目录当 CJS 解析——否则会报 `ReferenceError: require is not defined in ES module scope`；
    - 或按 [references/](../../references/) 中的机制说明，用项目已有技术栈（Python/Shell/……）移植等价实现；
-   - 或不落脚本，AI 直接手动维护数据文件（小项目完全可行——机制比工具重要）。
+   - 无脚本模式下，直接维护权威源记录。两种模式的编辑规则见下文。
 
 ## 房间速览
 
 | 房间 | 解决什么 | 数据真相源 | 参考脚本 | 详细手册 |
 |------|---------|-----------|---------|---------|
-| 1 档案室 | "设定写在哪？"/ AI 改文档误伤 | `truth-source.json` | `scripts/commands/truth.js` | [room-archive.md](../../references/room-archive.md) |
-| 2 意见箱 | 反馈蒸发 / 计划全在脑子里 | `feedback.json` + `ROADMAP.md` | `scripts/commands/feedback.js` | [room-feedback.md](../../references/room-feedback.md) |
-| 3 WIKI | 文档多了没法看 / 守则文件散落 | （只读，无状态） | `scripts/commands/docs-site.js` | [room-site.md](../../references/room-site.md) |
-| 4 文档翻译部 | 原文改了翻译过期没人知道 | `docs-manifest.json` + `docs-state.json` | `scripts/commands/docs-i18n.js` | [room-i18n.md](../../references/room-i18n.md) |
-| 5 游戏文案部 | 游戏内文字硬编码 / 译文过期 / 术语乱叫 | `game-i18n-manifest.json` + `glossary.json` | `scripts/commands/game-i18n.js` | [room-game-i18n.md](../../references/room-game-i18n.md) |
-| 6 发货口 | 版本号不一致 / 验收靠嘴说 / 发版手忙脚乱 | `version-manifest.json` + `sprints/N.md` + `CHANGELOG.md` | `version-sync.js` + `sprint.js` + `release.js` | [room-shipping.zh.md](../../references/room-shipping.zh.md) |
+| 1 档案室 | "设定写在哪？"/ AI 改文档误伤 | `truth-source.json` | `scripts/commands/truth.js` | [room-archive.zh.md](../../references/room-archive.zh.md) |
+| 2 意见箱 | 反馈蒸发 / 计划全在脑子里 | `feedback.json` + `ROADMAP.md` | `scripts/commands/feedback.js` | [room-feedback.zh.md](../../references/room-feedback.zh.md) |
+| 3 WIKI | 文档多了没法看 / 守则文件散落 | （只读，无状态） | `scripts/commands/docs-site.js` | [room-site.zh.md](../../references/room-site.zh.md) |
+| 4 文档翻译部 | 原文改了翻译过期没人知道 | `docs-manifest.json` + `docs-state.json` | `scripts/commands/docs-i18n.js` | [room-i18n.zh.md](../../references/room-i18n.zh.md) |
+| 5 游戏文案部 | 游戏内文字硬编码 / 译文过期 / 术语乱叫 | `game-i18n-manifest.json` + `glossary.json` | `scripts/commands/game-i18n.js` | [room-game-i18n.zh.md](../../references/room-game-i18n.zh.md) |
+| 6 发货口 | 版本号不一致 / 验收靠嘴说 / 发版手忙脚乱 | `version-manifest.json` + `sprints/N.md` + `CHANGELOG.md` | `version-sync.js` + `sprint.js` + `release.js` + `branch.js` | [room-shipping.zh.md](../../references/room-shipping.zh.md) |
 | 7 调度室 | "这个啥时候发？" / 没日期的计划都会悄悄滑 | `schedule.json` | `scripts/commands/schedule.js` | [room-schedule.zh.md](../../references/room-schedule.zh.md) |
 
 **建房间顺序建议**（非强制）：多数项目从「档案室」 + 「意见箱」起步收益最大；「文档翻译部」和「游戏文案部」在有多语言计划时再建（游戏文案部的问诊里有"没计划也该知道的一句忠告"）；「 WIKI 」是观景台，文档多起来后再装；「发货口」在第一次正式发版前建好；「调度室」和发货口配套——版本一旦有目标日期就装上，甘特视图会嵌进 WIKI 。
@@ -70,7 +70,7 @@ keeper-profile.json（项目档案 · 所有房间的行为都查它）
 1. **永不删除用户的原始文件。**"整理文档"= 登记进真相源 + 建立引用，**不是**移动、改名、删除。发现重复/过时文档，报告给用户听候处置，不自作主张清理。
 2. **归档代替删除。** 确需下线的文档，经用户同意后移入 `_archive/` 目录（ WIKI 和体检默认忽略该目录），永不物理删除。
 3. **破坏性操作必须逐项授权。** 覆盖类（`init --force`、`extract --force`）、批量移动/改名、目录重组——动手前列出受影响文件清单，用户确认后才执行。一次授权只管这一次，不得沿用到下次。
-4. **修改走最小切口。** 改已有文档只用章节替换（`truth.js update`），不整文件重写；数据文件（`feedback.json`、`docs-state.json` 等）只通过对应命令维护，不手撕 JSON。
+4. **只改相关章节或记录。** 安装脚本时，使用对应命令维护受管数据和替换章节。无脚本时可手工更新权威源记录（如 `feedback.json`），解析 JSON 并核对差异。收件箱视图和翻译指纹由工具生成，缺工具的检查标为待验，保留原始证据。
 5. **绝不执行递归删除。**（`rm -rf`、`Remove-Item -Recurse` 等）任何理由都不行，包括"清理测试文件"——单文件删除也需用户确认。
 6. **动手前可回退。** 项目在 git 下时，大范围操作前确认工作区干净（有未提交改动先提醒用户提交或暂存），保证一切可回退。
 
@@ -100,14 +100,14 @@ keeper-profile.json（项目档案 · 所有房间的行为都查它）
 - 发版前体检三连：`keeper game scan` + `keeper game drift --check` + `keeper game glossary lint`。
 
 **版本纪律（发货口）**
-- 版本号只通过 `keeper ver bump` 改，不手改单个文件。
+- 有脚本时用 `keeper ver bump`。无脚本时将已确认版本一次性写入 `version-manifest.json` 的全部目标并逐个比对。
 - 升级级别可以从 git 历史自动算：`keeper ver next` 预览，`keeper ver bump`（不带参数）应用——`feat:` → minor，`fix:`/`perf:` → patch，`BREAKING` → major（`blockMajor` 在 0.x 时降为 minor）。
 - 验收按 `keeper-profile.json` 的 `review.mode` 行事（详见下节）。
 - Sprint 条目做完才算完；"做完了"的标准是条目里写的验收字段，不是感觉。
 
 **发布流水线纪律（发货口·发布）**
 - `git commit` 前：`keeper release preflight commit`——扫已暂存源码的调试残留（`console.log` / `debugger` / `TODO`）、凭证文件（`.env` / `*.key` / `*.pem`）、对已暂存 `.js` 跑 `node --check`，以及（装了档案室/文档翻译部的话）真相源体检 + 文档同步。
-- `git push` 前：`keeper release preflight push`——commit 全部检查 + 测试套件 + 落后远程 + 分支确认（`main`/`master` 会警告）+ PROGRESS.md 时效 + `keeper sync`。
+- `git push` 前：`keeper release preflight push`——commit 全部检查 + 测试套件 + 落后远程 + 分支确认（`main`/`master` 会警告）+ PROGRESS.md 时效 + `keeper sync --check`。
 - 打包构建前：`keeper release preflight build`——版本号一致性 + 翻译同步 + sprint 验收完成 + 工作区干净 + release notes 文件存在 + `keeper stale`。
 - 问题（❌）拦截；警告（⚠️）提示。Preflight 绝不自动修——它告诉你哪里要改。
 - CHANGELOG 放在 `CHANGELOG.md`（Keep a Changelog 格式）：`keeper release changelog add "<文本>"` 追加到 `[Unreleased]`；`keeper release changelog cut <X.Y.Z>` 把 `[Unreleased]` 切成带今天日期的版本段。
@@ -122,7 +122,7 @@ keeper-profile.json（项目档案 · 所有房间的行为都查它）
 
 ## 验收模式（review.mode）
 
-问诊时确认，记在 profile 里。**是行为默认值，不是门禁**——CLI 不拦任何操作，只留痕（条目上记 `approvedBy`）。
+问诊时在档案中确定谁来审。小任务可自验。正式条目用 `--formal --covers` 登记覆盖项、来源及标准，再附上被测提交的运行记录。需要人工决定时加 `--human-review` 并保留原始凭据。`--by` 始终只标识填报人。见[发货口手册](../../references/room-shipping.zh.md)。
 
 | 模式 | 流程 | 适合 |
 |------|------|------|
@@ -217,7 +217,7 @@ WIKI 把 `START-HERE.md` 收进侧栏顶部的根文档分组——一开门就�
 
 ## 核心入口文档（问诊时创建）
 
-除了 `AGENTS.md` 和 `START-HERE.md`，每个项目都受益于一份**核心入口文档**小集——让新人（人和 AI 都是）不用 grep 全仓库就能定位。问诊时在项目根创建这些，紧跟 `AGENTS.md` 和 `START-HERE.md` 之后：
+`AGENTS.md`、`START-HERE.md` 放项目根。新建下列已启用的五份状态和设计文档时放在 `docs/`。已有文档原地沿用。入口命令先查根目录，再查 `docs/`。若两处都有同名文件，先确认哪份是权威再编辑。
 
 | 文档 | 用途 | 和邻居的区别 |
 |------|------|--------------|
@@ -245,7 +245,7 @@ WIKI 把 `START-HERE.md` 收进侧栏顶部的根文档分组——一开门就�
 
 ### 自动收录
 
-WIKI 把这五个文档和 README/ROADMAP/START-HERE 一起收进根文档分组——一开门就看得见。侧栏的类型分组（入口 / 计划 / 架构 / 设计 / 美术 / 反馈）会自动把它们放进对应桶；关键词表见 [room-site.md](../../references/room-site.md)。
+WIKI 扫描 `docs/` 时会收录这些文档，也识别旧项目的根目录入口。侧栏分类见[站点手册](../../references/room-site.zh.md)。
 
 ### 可以关掉
 
@@ -265,13 +265,14 @@ indie-keeper/
 │   ├── room-site.md / .zh.md
 │   ├── room-i18n.md / .zh.md
 │   ├── room-game-i18n.md / .zh.md
-│   └── room-shipping.md / .zh.md
+│   ├── room-shipping.md / .zh.md
+│   └── room-schedule.md / .zh.md
 ├── scripts/                    ← 零依赖 Node 参考实现（可拷走 / 可移植）
 │   ├── keeper.js               ← 统一入口 + hello/status/where + 日常命令
 │   ├── lang.js                 ← 双语输出小工具（--lang > profile > 默认 en）
-│   ├── lib/                    ← 共享库
-│   └── commands/               ← 一文件一房间（truth / feedback / docs-site / docs-i18n /
-│                                 game-i18n / version-sync / sprint / release / schedule）
+│   ├── project-files.js        ← 登记表路径
+│   └── commands/               ← 房间命令（truth / feedback / docs-site / docs-i18n /
+│                                 game-i18n / version-sync / sprint / release / branch / schedule）
 ├── templates/                  ← 各数据文件的空白模板与范本 + UIUX-SPEC 模板
 └── docs/                       ← 本仓库自己的状态文档（内部用，中文）
     ├── zh/                     ← 根文档的中文版（README.zh.md、SKILL.zh.md）

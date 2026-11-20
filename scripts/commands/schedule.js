@@ -51,7 +51,7 @@ const A = parseArgv(process.argv.slice(2));
 function flag(name, dflt) { return name in A.flags ? A.flags[name] : dflt; }
 
 const ROOT = path.resolve(flag('root', process.cwd()));
-const CANDIDATES = ['schedule.json', 'docs/schedule.json', '.docs/schedule.json'];
+const CANDIDATES = require('../project-files').schedule;
 
 const lang = detectLang();
 
@@ -172,7 +172,7 @@ function daysBetween(a, b) {
 // ── commands ──
 function cmdInit() {
   const force = A.bools.has('force');
-  const target = path.join(ROOT, CANDIDATES[0]);
+  const target = findStore() || path.join(ROOT, CANDIDATES[0]);
   if (fs.existsSync(target) && !force) { console.error(t('initExists')); process.exit(1); }
   save(target, emptySchedule());
   console.log(t('initDone'));

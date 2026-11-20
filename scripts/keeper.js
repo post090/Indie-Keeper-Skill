@@ -18,7 +18,10 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { detectLang, makeT } = require('./lang');
 
-const lang = detectLang();
+const projectFiles = require('./project-files');
+const cli = parseEntryArgs(process.argv.slice(2));
+const ROOT = cli.flags.root ? path.resolve(cli.flags.root) : projectRoot();
+const lang = detectLang(process.argv.slice(2), ROOT);
 
 // ── Room registry: door plate (with aliases) → script file ──
 const ROOMS = [
@@ -55,7 +58,10 @@ const ROOMS = [
 ];
 
 const MSG = {
-  tagline: { en: 'kept tidy by indie-keeper', zh: '由 indie-keeper 照看' },
+  optionValue: { en: 'Missing value for {0}', zh: '{0} 缺少参数值' },
+  progressUsage: { en: 'usage: keeper progress add "<text>"', zh: '用法：keeper progress add "<内容>"' },
+  planUsage: { en: 'usage: keeper plan done <P-X>', zh: '用法：keeper plan done <任务编号>' },
+  refreshUsage: { en: 'usage: keeper start-here refresh [--dry-run]', zh: '用法：keeper start-here refresh [--dry-run]' },
   usageHead: {
     en: '  usage: keeper <command> [args…]\n\n  ── on shift-start (orient yourself) ──',
     zh: '  用法：keeper <命令> [参数…]\n\n  ── 接班时（先看清状态） ──',
@@ -104,20 +110,27 @@ const MSG = {
     zh: '\n  常用命令：\n    keeper where <主题>       这个设定写在哪个文件？\n    keeper fb add "<内容>"    随手记一条反馈\n    keeper site serve         本地逛 WIKI\n    keeper sprint show        当前 sprint 详情\n    keeper help               看全部命令\n',
   },
   // hello — docs to maintain section
+  docCommits: { en: ' · {0} commits since', zh: ' · 此后 {0} 次提交' },
+  docCurrent: { en: ' · up to date', zh: ' · 已是最新' },
+  docProgress: { en: 'last {0}{1} · keeper progress add "<text>"', zh: '更新于 {0}{1} · keeper progress add "<内容>"' },
+  docPending: { en: '{0} pending', zh: '{0} 项待办' },
+  docAllDone: { en: 'no pending numbered plan rows', zh: '编号计划行无待办' },
+  docStartHere: { en: 'review the progress summary', zh: '检查进展总结' },
+  docTopics: { en: '{0} topics registered', zh: '已登记 {0} 个主题' },
   helloDocs: { en: 'docs to maintain', zh: '要维护的文档' },
   // progress
-  progressNoFile: { en: '✗ no PROGRESS.md at project root', zh: '✗ 项目根没有 PROGRESS.md' },
+  progressNoFile: { en: '✗ no PROGRESS.md in the root or docs/', zh: '✗ 根目录与 docs/ 中均无 PROGRESS.md' },
   progressNoText: { en: '✗ no text provided · usage: keeper progress add "<text>"', zh: '✗ 没写内容 · 用法：keeper progress add "<内容>"' },
   progressAdded: { en: '✓ PROGRESS.md: appended under ### {0}', zh: '✓ PROGRESS.md：在 ### {0} 下追加一条' },
   progressNewDay: { en: '✓ PROGRESS.md: new entry ### {0} (no section for today yet)', zh: '✓ PROGRESS.md：新建 ### {0} 段（今天还没记过）' },
   // plan
-  planNoFile: { en: '✗ no PLAN.md at project root', zh: '✗ 项目根没有 PLAN.md' },
+  planNoFile: { en: '✗ no PLAN.md in the root or docs/', zh: '✗ 根目录与 docs/ 中均无 PLAN.md' },
   planNoId: { en: '✗ no task ID provided · usage: keeper plan done <P-X>', zh: '✗ 没写任务 ID · 用法：keeper plan done <P-X>' },
   planNotFound: { en: '✗ task {0} not found in PLAN.md tables', zh: '✗ PLAN.md 表格里没找到任务 {0}' },
   planDone: { en: '✓ PLAN.md: marked {0} as ✅', zh: '✓ PLAN.md：{0} 标记为 ✅' },
   planAlready: { en: '· {0} was already ✅', zh: '· {0} 已经是 ✅ 了' },
   // start-here refresh
-  shNoFile: { en: '✗ no START-HERE.md at project root', zh: '✗ 项目根没有 START-HERE.md' },
+  shNoFile: { en: '✗ no START-HERE.md in the root or docs/', zh: '✗ 根目录与 docs/ 中均无 START-HERE.md' },
   shNoMarkers: { en: '✗ no <!-- keeper:refresh --> markers found in START-HERE.md — cannot refresh safely', zh: '✗ START-HERE.md 里没找到 <!-- keeper:refresh --> 标记 —— 无法安全刷新' },
   shRefreshed: { en: '✓ START-HERE.md: refreshed {0} section(s)', zh: '✓ START-HERE.md：刷新了 {0} 段' },
   shDryRun: { en: '(dry run — changes not written)', zh: '（预览模式 —— 不写文件）' },
@@ -139,23 +152,18 @@ const MSG = {
   refsNone: { en: '  (none)', zh: '  （无）' },
   refsHint: { en: '\n  tip: current fact = SKILL / README / AGENTS / START-HERE / DOCS-OVERVIEW / room manuals · historical = PROGRESS / ROADMAP / sprints / HANDOFF', zh: '\n  提示：当前事实 = SKILL / README / AGENTS / START-HERE / DOCS-OVERVIEW / 房间手册 · 历史叙述 = PROGRESS / ROADMAP / sprints / HANDOFF' },
   // sync · end-of-session sweep
+  syncReadOnly: { en: '\n  sync · check project files\n', zh: '\n  sync · 检查项目文件\n' },
   syncHead: { en: '\n  sync · refresh derived content + run all checks\n', zh: '\n  sync · 刷新派生内容 + 跑所有检查\n' },
   syncRefreshOk: { en: '  ✓ {0}: refreshed {1} section(s)', zh: '  ✓ {0}：刷新了 {1} 段' },
   syncRefreshSkip: { en: '  = {0}: no refresh markers found (skip)', zh: '  = {0}：没有刷新标记（跳过）' },
   syncRefreshFail: { en: '  ✗ {0}: {1}', zh: '  ✗ {0}：{1}' },
   syncCheckOk: { en: '  ✓ {0}: ok', zh: '  ✓ {0}：通过' },
   syncCheckSkip: { en: '  = {0}: skipped (room not installed)', zh: '  = {0}：跳过（房间未安装）' },
-  syncCheckFail: { en: '  ✗ {0}: problems found (run `keeper {0}` for details)', zh: '  ✗ {0}：发现问题（跑 `keeper {0}` 看详情）' },
+  syncCheckFail: { en: '  ✗ {0}: problems found (run `keeper {0} {1}` for details)', zh: '  ✗ {0}：发现问题（跑 `keeper {0} {1}` 看详情）' },
   syncSummary: { en: '\n  {0} step(s) ok · {1} problem(s)\n', zh: '\n  {0} 步通过 · {1} 个问题\n' },
   syncHint: { en: '  all green — safe to end the session', zh: '  全绿——可以收工了' },
   // stale · staleness sweep
   staleHead: { en: '\n  stale · what might be outdated\n', zh: '\n  stale · 哪些可能过期了\n' },
-  staleTranslation: { en: '  ⚠️ translations: {0} doc(s) stale', zh: '  ⚠️ 翻译：{0} 份文档过期' },
-  staleTranslationOk: { en: '  ✓ translations: all fresh', zh: '  ✓ 翻译：全部同步' },
-  staleDeadLink: { en: '  ❌ dead links: {0}', zh: '  ❌ 死链：{0}' },
-  staleDeadLinkOk: { en: '  ✓ dead links: none', zh: '  ✓ 死链：无' },
-  staleUntracked: { en: '  ⚠️ untracked docs: {0}', zh: '  ⚠️ 未登记文档：{0}' },
-  staleUntrackedOk: { en: '  ✓ untracked docs: none', zh: '  ✓ 未登记文档：无' },
   staleStaleTasks: { en: '  ⚠️ PLAN.md tasks marked ⬜/🔧 but mentioned as done in PROGRESS: {0}', zh: '  ⚠️ PLAN.md 标 ⬜/🔧 但 PROGRESS 显示已完成的任务：{0}' },
   staleStaleTasksOk: { en: '  ✓ stale tasks: none', zh: '  ✓ 过期任务：无' },
   staleSummary: { en: '\n  {0} issue(s) found\n', zh: '\n  发现 {0} 个问题\n' },
@@ -163,19 +171,15 @@ const MSG = {
 };
 const t = makeT(MSG, lang);
 
-// ── chibi robot butler: big head, wrench, and the house it keeps ──
-// pure ASCII on purpose: fullwidth chars (■●) and box drawing have ambiguous
-// width across fonts/terminals — mixed lines WILL misalign somewhere.
-// ASCII in a monospace font is the only layout that never breaks.
+// Fixed-width ASCII. Project names stay on a separate, naturally wrapping line.
 const BANNER = String.raw`
-      .-----.
-      | o o |          .--.
-      |  v  |         /    \
-    .---------.      /______\
-    |   ###   |--E   | |  | |
-    '---------'      | |__| |
-      _|   |_        |______|
-`;
+        .-.
+     .--'-'--.      _           _ _            _
+     | [o o] |     (_)_ __   __| (_) ___      | | _____  ___ _ __   ___ _ __
+     |   ^   |     | | '_ \ / _' | |/ _ \____| |/ / _ \/ _ \ '_ \ / _ \ '__|
+     '---+---'     | | | | | (_| | |  __/____|   <  __/  __/ |_) |  __/ |
+       _/ \_       |_|_| |_|\__,_|_|\___|    |_|\_\___|\___| .__/ \___|_|
+                                                           |_|`.trimEnd();
 
 function findRoom(word) {
   return ROOMS.find(r => r.cmd === word || r.aliases.includes(word)) || null;
@@ -184,7 +188,7 @@ function findRoom(word) {
 // ── shared context: project profile / stores (best effort, never throws) ──
 function findUp(names) {
   let dir = process.cwd();
-  for (let up = 0; up < 8; up++) {
+  while (true) {
     for (const n of names) {
       const p = path.join(dir, n);
       if (fs.existsSync(p)) return p;
@@ -199,24 +203,30 @@ function findUp(names) {
 function readJSON(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 
 function projectName() {
-  const p = findUp(['keeper-profile.json']);
-  const prof = p && readJSON(p);
-  return (prof && prof.project && prof.project.name) || null;
+  return loadProfile(ROOT)?.project?.name || null;
 }
 
 function projectRoot() {
-  const p = findUp(['keeper-profile.json', '.git', 'package.json']);
+  // Prefer keeper-profile.json (the governance root) so monorepo / nested
+  // code-project layouts don't get hijacked by an inner package.json found first.
+  // Fall back to .git / package.json only when no profile exists yet.
+  const p = findUp(['keeper-profile.json']) || findUp(['.git', 'package.json']);
   return p ? path.dirname(p) : process.cwd();
 }
 
-// Parse --root=<path> from argv, falling back to projectRoot() (auto-detect).
-// Used by refs/sync/stale so they respect --root= like the room scripts do.
-function rootFromArgs(args) {
-  for (const a of args || []) {
-    const m = /^--root=(.+)$/.exec(a);
-    if (m) return path.resolve(m[1]);
+// Remove shared flags from positional input before dispatch.
+function parseEntryArgs(raw) {
+  const args = [];
+  const flags = {};
+  for (let i = 0; i < raw.length; i++) {
+    const match = /^--(root|lang|ui-lang)(?:=(.*))?$/.exec(raw[i]);
+    if (!match) { args.push(raw[i]); continue; }
+    const name = match[1];
+    const value = match[2] ?? raw[++i];
+    if (!value || value.startsWith('--')) return { args, flags, error: '--' + name };
+    flags[name] = value;
   }
-  return projectRoot();
+  return { args, flags };
 }
 
 function safeExec(argv, cwd) {
@@ -235,7 +245,7 @@ function loadFeedback(root) {
 }
 
 function loadTruth(root) {
-  for (const c of ['truth-source.json', 'docs/truth-source.json', '.docs/truth-source.json']) {
+  for (const c of projectFiles.truth) {
     const s = readJSON(path.join(root, c));
     if (s && s.topics) return s;
   }
@@ -334,7 +344,7 @@ function countCommitsSince(root, dateStr) {
 // Compact MM-DD format for mtime display (year is obvious from context).
 function fmtMD(d) {
   if (!d) return '?';
-  const m = d.getUTCMonth() + 1; const day = d.getUTCDate();
+  const m = d.getMonth() + 1; const day = d.getDate();
   return (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
 }
 
@@ -347,16 +357,17 @@ function fmtMD(d) {
 function cmdProgress(args) {
   const sub = args[0];
   if (sub !== 'add') {
-    console.error('usage: keeper progress add "<text>"');
+    console.error(t('progressUsage'));
     process.exit(1);
   }
   const text = args.slice(1).join(' ').trim();
   if (!text) { console.error(t('progressNoText')); process.exit(1); }
-  const root = projectRoot();
+  const root = ROOT;
   const file = findEntryDoc(root, 'PROGRESS.md');
   if (!file) { console.error(t('progressNoFile')); process.exit(1); }
   let content = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.getFullYear() + '-' + fmtMD(now);
 
   // Find the first "### YYYY-MM-DD" line (most recent entry, since log is reverse-chrono).
   const dateRe = /^### (\d{4}-\d{2}-\d{2})/m;
@@ -397,12 +408,12 @@ function cmdProgress(args) {
 function cmdPlan(args) {
   const sub = args[0];
   if (sub !== 'done') {
-    console.error('usage: keeper plan done <P-X>');
+    console.error(t('planUsage'));
     process.exit(1);
   }
   const id = (args[1] || '').trim();
   if (!id) { console.error(t('planNoId')); process.exit(1); }
-  const root = projectRoot();
+  const root = ROOT;
   const file = findEntryDoc(root, 'PLAN.md');
   if (!file) { console.error(t('planNoFile')); process.exit(1); }
   const content = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
@@ -439,11 +450,11 @@ function cmdPlan(args) {
 function cmdStartHere(args) {
   const sub = args[0];
   if (sub !== 'refresh') {
-    console.error('usage: keeper start-here refresh [--dry-run]');
+    console.error(t('refreshUsage'));
     process.exit(1);
   }
   const dryRun = args.includes('--dry-run') || args.includes('-n');
-  const root = projectRoot();
+  const root = ROOT;
   // Respect the opt-out: startHere.enabled=false means the project deliberately
   // has no human entry page — degrade gracefully instead of refreshing anyway.
   const shProf = loadProfile(root);
@@ -453,44 +464,31 @@ function cmdStartHere(args) {
   }
   const file = findEntryDoc(root, 'START-HERE.md');
   if (!file) { console.error(t('shNoFile')); process.exit(1); }
-  let content = fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+  const content = fs.readFileSync(file, 'utf8');
 
-  // Find all refresh regions: <!-- keeper:refresh:start <name> --> ... <!-- keeper:refresh:end -->
-  const regions = [];
-  const re = /<!--\s*keeper:refresh:start\s+(\w+)\s*-->([\s\S]*?)<!--\s*keeper:refresh:end\s*-->/g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    regions.push({ name: m[1], start: m.index, end: m.index + m[0].length, inner: m[0] });
-  }
-  if (!regions.length) { console.error(t('shNoMarkers')); process.exit(1); }
-
-  let refreshed = 0;
-  for (const r of regions) {
-    const replacement = r.name === 'progress' ? buildProgressSection(root)
-                      : r.name === 'docmap' ? buildDocMapSection(root)
-                      : null;
-    if (!replacement) continue;
-    content = content.slice(0, r.start) + replacement + content.slice(r.end);
-    refreshed++;
-    // Re-index subsequent regions since offsets shifted
-    const newRegions = [];
-    const re2 = /<!--\s*keeper:refresh:start\s+(\w+)\s*-->([\s\S]*?)<!--\s*keeper:refresh:end\s*-->/g;
-    let m2;
-    while ((m2 = re2.exec(content)) !== null) {
-      newRegions.push({ name: m2[1], start: m2.index, end: m2.index + m2[0].length });
-    }
-    regions.length = 0;
-    regions.push(...newRegions);
-  }
+  const result = refreshRegions(root, content);
+  if (!result.count) { console.error(t('shNoMarkers')); process.exit(1); }
+  const refreshed = result.count;
 
   if (dryRun) {
     console.log(t('shRefreshed', refreshed) + ' ' + t('shDryRun'));
     console.log('\n--- diff (first 2000 chars of new content) ---\n');
-    console.log(content.slice(0, 2000));
+    console.log(result.content.slice(0, 2000));
     return;
   }
-  fs.writeFileSync(file, content);
+  if (content !== result.content) fs.writeFileSync(file, result.content);
   console.log(t('shRefreshed', refreshed));
+}
+
+function refreshRegions(root, text) {
+  let count = 0;
+  const region = /<!--\s*keeper:refresh:start\s+(\w+)\s*-->[\s\S]*?<!--\s*keeper:refresh:end\s*-->/g;
+  const content = text.replace(region, (original, name) => {
+    if (name !== 'progress' && name !== 'docmap') return original;
+    count++;
+    return name === 'progress' ? buildProgressSection(root) : buildDocMapSection(root);
+  });
+  return { content, count };
 }
 
 // Build the "📰 进展总结" section content from PROGRESS.md + git log.
@@ -586,11 +584,22 @@ function buildDocMapSection(root) {
   return lines.join('\n');
 }
 
-function printBanner() {
-  console.log(BANNER);
+function printBanner(showProject = false) {
   const name = projectName();
-  // with a profile: "<game name> · kept tidy by indie-keeper"; bare: just the brand
-  console.log(name ? `      ${name} · ${t('tagline')}` : '      indie-keeper');
+  if (!process.stdout.isTTY || process.env.CI || cli.args.includes('--json')) {
+    if (showProject && name) console.log(name);
+    return;
+  }
+  const width = process.stdout.columns || 0;
+  const canColor = !process.env.NO_COLOR && process.env.TERM !== 'dumb';
+  if (canColor && BANNER.split('\n').every(line => line.length <= width)) {
+    console.log('\x1b[36m' + BANNER + '\x1b[0m');
+  } else if (width >= 18) {
+    console.log('[o_o] indie-keeper');
+  } else if (width >= 5) {
+    console.log('[o_o]');
+  }
+  if (name) console.log(name);
 }
 
 // ── built-in: keeper (bare) / keeper help ──
@@ -628,10 +637,10 @@ function printMenu() {
 function cmdRefs(args) {
   const keyword = args.find(a => !a.startsWith('--'));
   if (!keyword) { console.error(t('refsNoKeyword')); process.exit(1); }
-  const root = rootFromArgs(args);
+  const root = ROOT;
 
   // Classify a file by its path: "current fact" vs "historical narrative" vs "other"
-  const HISTORICAL = ['PROGRESS.md', 'ROADMAP.md', 'HANDOFF.md'];
+  const HISTORICAL = ['progress.md', 'roadmap.md', 'handoff.md'];
   const HISTORICAL_DIRS = ['docs/sprints/', 'docs/decisions/', 'docs/feedback/'];
   function classify(rel) {
     const lower = rel.toLowerCase().replace(/\\/g, '/');
@@ -703,37 +712,48 @@ function cmdRefs(args) {
   console.log(t('refsHint'));
 }
 
-// ── built-in: keeper sync · end-of-session sweep ──
-// One command for the AI to run at session end: refreshes all refreshable
-// derived content (START-HERE regions, DOCS-OVERVIEW if it has markers) and
-// runs every checkup command (truth check, docs status, schedule check).
-// Reports each step's outcome and a final summary. Exits non-zero on any problem.
-function cmdSync(args) {
-  const root = rootFromArgs(args || []);
-  let okSteps = 0, problems = 0;
-  console.log(t('syncHead'));
+// Use each room's exit code; diagnostic prose is localized.
+function runChecks(root, rooms) {
+  const checks = {
+    docs: ['stamp', '--all', '--check'],
+    truth: ['check'],
+    schedule: ['check'],
+  };
+  let passed = 0, failed = 0;
+  for (const room of rooms) {
+    if (!projectFiles[room].some(file => fs.existsSync(path.join(root, file)))) {
+      console.log(t('syncCheckSkip', room));
+      continue;
+    }
+    const script = path.join(__dirname, 'commands', findRoom(room).script);
+    const uiFlag = room === 'docs' ? '--ui-lang' : '--lang';
+    const args = [script, ...checks[room], '--root', root, uiFlag, lang];
+    const r = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    if (r.status === 0) {
+      passed++;
+      console.log(t('syncCheckOk', room));
+    } else {
+      failed++;
+      console.log(t('syncCheckFail', room, checks[room].join(' ')));
+      console.error([r.stdout, r.stderr, r.error?.message].filter(Boolean).join('\n').trim());
+    }
+  }
+  return { passed, failed };
+}
 
-  // 1. refresh START-HERE.md regions (if markers exist)
+function cmdSync(args) {
+  const root = ROOT;
+  let okSteps = 0, problems = 0;
+  console.log(t(args.includes('--check') ? 'syncReadOnly' : 'syncHead'));
+
+  // Refresh enabled regions only on a write-mode sweep.
   const sh = findEntryDoc(root, 'START-HERE.md');
-  if (sh) {
+  if (!args.includes('--check') && sh && loadProfile(root)?.startHere?.enabled !== false) {
     try {
-      let content = fs.readFileSync(sh, 'utf8').replace(/\r\n?/g, '\n');
-      const re = /<!--\s*keeper:refresh:start\s+(\w+)\s*-->([\s\S]*?)<!--\s*keeper:refresh:end\s*-->/g;
-      let count = 0;
-      const replacements = [];
-      let m;
-      while ((m = re.exec(content)) !== null) {
-        const name = m[1];
-        let replacement = null;
-        if (name === 'progress') replacement = buildProgressSection(root);
-        else if (name === 'docmap') replacement = buildDocMapSection(root);
-        if (replacement) { replacements.push({ start: m.index, end: m.index + m[0].length, replacement }); count++; }
-      }
-      // apply replacements from end to start so indexes stay valid
-      replacements.sort((a, b) => b.start - a.start);
-      for (const r of replacements) content = content.slice(0, r.start) + r.replacement + content.slice(r.end);
+      const original = fs.readFileSync(sh, 'utf8');
+      const { content, count } = refreshRegions(root, original);
       if (count > 0) {
-        fs.writeFileSync(sh, content);
+        if (original !== content) fs.writeFileSync(sh, content);
         console.log(t('syncRefreshOk', 'START-HERE.md', count));
         okSteps++;
       } else {
@@ -742,30 +762,11 @@ function cmdSync(args) {
     } catch (e) { console.log(t('syncRefreshFail', 'START-HERE.md', e.message)); problems++; }
   }
 
-  // 2. run checkups via room scripts (truth check, docs status, schedule check)
+  // 2. run checkups via room scripts (truth check, docs stamp --all --check, schedule check)
   // Each check is skipped if the room's data file is missing (room not installed).
-  const checks = [
-    { cmd: 'truth',    script: 'truth.js',        args: ['check'],  dataFile: 'docs/truth-source.json' },
-    { cmd: 'docs',     script: 'docs-i18n.js',    args: ['status'], dataFile: 'docs/docs-manifest.json' },
-    { cmd: 'schedule', script: 'schedule.js',     args: ['check'],  dataFile: 'docs/schedule.json' },
-  ];
-  for (const c of checks) {
-    const scriptPath = path.join(__dirname, 'commands', c.script);
-    if (!fs.existsSync(scriptPath)) continue;
-    // skip if the room's data file is absent (room not installed in this project)
-    if (c.dataFile && !fs.existsSync(path.join(root, c.dataFile))) {
-      console.log(t('syncCheckSkip', c.cmd));
-      continue;
-    }
-    const r = spawnSync(process.execPath, [scriptPath, ...c.args, `--root=${root}`], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-    if (r.status === 0) {
-      console.log(t('syncCheckOk', c.cmd));
-      okSteps++;
-    } else {
-      console.log(t('syncCheckFail', c.cmd));
-      problems++;
-    }
-  }
+  const checked = runChecks(root, ['truth', 'docs', 'schedule']);
+  okSteps += checked.passed;
+  problems += checked.failed;
 
   console.log(t('syncSummary', okSteps, problems));
   if (problems === 0) console.log(t('syncHint'));
@@ -774,40 +775,17 @@ function cmdSync(args) {
 
 // ── built-in: keeper stale · staleness sweep ──
 // Scans for everything that might be outdated across the project:
-//   - stale translations (docs-i18n status)
+//   - missing, stale, or unfinished translations (docs stamp --all --check)
 //   - dead links / untracked docs (truth check)
 //   - PLAN.md tasks marked ⬜/🔧 but mentioned as done in PROGRESS
 // More diagnostic than `sync` (which refreshes + checks) — this is for
 // "what did the AI forget to update?".
-function cmdStale(args) {
-  const root = rootFromArgs(args || []);
+function cmdStale() {
+  const root = ROOT;
   let issues = 0;
   console.log(t('staleHead'));
 
-  // 1. translations: parse docs-i18n status output for stale count
-  const docsScript = path.join(__dirname, 'commands', 'docs-i18n.js');
-  if (fs.existsSync(docsScript)) {
-    const r = spawnSync(process.execPath, [docsScript, 'status', `--root=${root}`], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-    const out = r.stdout || '';
-    // match "totals: X missing · Y needing work" / "合计：没翻 X 处 · 待更新 Y 处"
-    const m = out.match(/(?:totals|合计)[^\d]*(\d+)[^\d]*(\d+)/);
-    const needing = m ? +m[2] : 0;
-    if (needing > 0) { console.log(t('staleTranslation', needing)); issues += needing; }
-    else console.log(t('staleTranslationOk'));
-  }
-
-  // 2. dead links + untracked docs: parse truth check output
-  const truthScript = path.join(__dirname, 'commands', 'truth.js');
-  if (fs.existsSync(truthScript)) {
-    const r = spawnSync(process.execPath, [truthScript, 'check', `--root=${root}`], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
-    const out = r.stdout || '';
-    const deadLinks = (out.match(/dead link/g) || []).length;
-    const untracked = (out.match(/untracked/g) || []).length;
-    if (deadLinks > 0) { console.log(t('staleDeadLink', deadLinks)); issues += deadLinks; }
-    else console.log(t('staleDeadLinkOk'));
-    if (untracked > 0) { console.log(t('staleUntracked', untracked)); issues += untracked; }
-    else console.log(t('staleUntrackedOk'));
-  }
+  issues += runChecks(root, ['docs', 'truth']).failed;
 
   // 3. PLAN tasks marked ⬜/🔧 but PROGRESS says done
   const planPath = findEntryDoc(root, 'PLAN.md');
@@ -823,9 +801,10 @@ function cmdStale(args) {
         if (m) taskIds.push(m[1]);
       }
       // check if PROGRESS mentions these task ids as done (heuristic: id appears near "done"/"✅"/"完成")
+      const lines = progressText.split('\n');
       const stale = taskIds.filter(id => {
-        const lines = progressText.split('\n');
-        return lines.some(l => l.includes(id) && /done|✅|完成|已做|ship/.test(l));
+        const task = new RegExp('\\b' + id + '\\b');
+        return lines.some(l => task.test(l) && /done|✅|完成|已做|ship/.test(l));
       });
       if (stale.length) { console.log(t('staleStaleTasks', stale.join(', '))); issues += stale.length; }
       else console.log(t('staleStaleTasksOk'));
@@ -839,8 +818,8 @@ function cmdStale(args) {
 
 // ── built-in: keeper hello · 30-second handover briefing ──
 function cmdHello() {
-  const root = projectRoot();
-  printBanner();
+  const root = ROOT;
+  printBanner(true);
   console.log('');
 
   // version (package.json, if any)
@@ -859,6 +838,19 @@ function cmdHello() {
   for (const rel of ['docs/HANDOFF.md', 'HANDOFF.md']) {
     if (fs.existsSync(path.join(root, rel))) {
       console.log('  ' + t('helloHandoff', rel));
+      const lines = fs.readFileSync(path.join(root, rel), 'utf8').split(/\r?\n/);
+      const start = lines.findIndex(line => /^##\s+(Handoff brief|接班要点)\s*$/i.test(line));
+      if (start >= 0) {
+        const keys = new Set();
+        for (const line of lines.slice(start + 1)) {
+          if (/^#{1,2}\s/.test(line) || keys.size === 4) break;
+          const field = /^- (Next|Why|Decision|Evidence|下一步|原因|决策|证据)\s*[:：]\s*(\S.*)$/i.exec(line);
+          if (field && !keys.has(field[1].toLowerCase())) {
+            keys.add(field[1].toLowerCase());
+            console.log('    ' + line.slice(2));
+          }
+        }
+      }
       break;
     }
   }
@@ -905,24 +897,24 @@ function cmdHello() {
     const last = lastProgressDate(docs['PROGRESS.md'].text);
     const commits = countCommitsSince(root, last);
     const lastStr = last ? last.slice(5) : '—';
-    const commitStr = (commits && commits > 0) ? ` · ${commits} commits since` : (last ? ' · up to date' : '');
-    docLines.push(`PROGRESS.md   last ${lastStr}${commitStr} · keeper progress add "<text>"`);
+    const commitStr = commits === null ? '' : commits > 0 ? t('docCommits', commits) : t('docCurrent');
+    docLines.push(`PROGRESS.md   ${t('docProgress', lastStr, commitStr)}`);
   }
   if (docs['PLAN.md'] && entryOn('plan')) {
     const pending = countPlanPending(docs['PLAN.md'].text);
-    const taskStr = pending > 0 ? `${pending} pending` : 'all ✅';
+    const taskStr = pending > 0 ? t('docPending', pending) : t('docAllDone');
     docLines.push(`PLAN.md       ${taskStr} · keeper plan done <P-X>`);
   }
   if (startHereEnabled) {
     if (docs['START-HERE.md']) {
-      docLines.push(`START-HERE    ${fmtMD(docs['START-HERE.md'].mtime)} · check if 进展总结 stale`);
+      docLines.push(`START-HERE    ${fmtMD(docs['START-HERE.md'].mtime)} · ${t('docStartHere')}`);
     } else {
       console.log('  ' + t('helloStartHereMissing'));
     }
   }
   if (docs['DOCS-OVERVIEW.md'] && entryOn('docsOverview')) {
     const topics = ts ? Object.keys(ts.topics).length : 0;
-    docLines.push(`DOCS-OVERVIEW ${fmtMD(docs['DOCS-OVERVIEW.md'].mtime)} · ${topics} topics registered`);
+    docLines.push(`DOCS-OVERVIEW ${fmtMD(docs['DOCS-OVERVIEW.md'].mtime)} · ${t('docTopics', topics)}`);
   }
   if (docs['ARCHITECTURE.md'] && entryOn('architecture')) {
     docLines.push(`ARCHITECTURE  ${fmtMD(docs['ARCHITECTURE.md'].mtime)}`);
@@ -940,7 +932,7 @@ function cmdHello() {
 
 // ── built-in: keeper status · workspace health ──
 function cmdStatus() {
-  const root = projectRoot();
+  const root = ROOT;
   const name = projectName() || path.basename(root);
   const pkg = readJSON(path.join(root, 'package.json'));
   console.log(`\n  ${name}${pkg && pkg.version ? ' · v' + pkg.version : ''}\n`);
@@ -979,24 +971,8 @@ function cmdStatus() {
 }
 
 function main() {
-  // --lang may appear anywhere (before or after the command). Find the command
-  // word = first non-flag arg, skipping --lang <value> / --lang=<value>. All
-  // other args (including --lang) forward to room scripts as-is: each script
-  // reads --lang itself via detectLang(). For docs-i18n/game-i18n, --lang is
-  // the *target translation language* (not UI); their UI flag is --ui-lang.
-  // Previously we stripped --lang and rewrote it to --ui-lang for those two
-  // scripts, which broke `keeper docs extract --lang zh` (the target-language
-  // intent was silently turned into a UI-language switch).
-  const raw = process.argv.slice(2);
-  let wordIdx = -1;
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === '--lang') { i++; continue; }        // skip --lang <value>
-    if (/^--lang=/.test(raw[i])) continue;              // skip --lang=<value>
-    if (raw[i].startsWith('--')) continue;              // skip other flags
-    wordIdx = i; break;
-  }
-  const word = wordIdx >= 0 ? raw[wordIdx] : null;
-  const rest = raw.filter((_, i) => i !== wordIdx);
+  if (cli.error) { console.error(t('optionValue', cli.error)); process.exit(1); }
+  const [word, ...rest] = cli.args;
 
   if (!word) { printMenu(); return; }
   if (word === 'help' || word === '--help') { printMenu(); return; }
@@ -1007,7 +983,7 @@ function main() {
   if (word === 'start-here') { cmdStartHere(rest); return; }
   if (word === 'refs') { cmdRefs(rest); return; }
   if (word === 'sync') { cmdSync(rest); return; }
-  if (word === 'stale') { cmdStale(rest); return; }
+  if (word === 'stale') { cmdStale(); return; }
 
   // keeper where <topic> → Archive's where (same registry, shorter to type)
   const forward = word === 'where'
@@ -1022,6 +998,10 @@ function main() {
 
   const script = path.join(__dirname, 'commands', forward ? forward.script : room.script);
   const pass = forward ? forward.args : rest;
+  pass.push('--root', ROOT);
+  for (const flag of ['lang', 'ui-lang']) {
+    if (cli.flags[flag]) pass.push('--' + flag, cli.flags[flag]);
+  }
   const r = spawnSync(process.execPath, [script, ...pass], { stdio: 'inherit' });
   process.exit(r.status === null ? 1 : r.status);
 }

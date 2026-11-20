@@ -346,7 +346,7 @@ function resolveImage(docRel, src) {
 // /api/doc route to attach a Gantt SVG when rendering ROADMAP.md. Same search
 // order as schedule.js: root, docs/, .docs/.
 function tryLoadSchedule() {
-  for (const c of ['schedule.json', 'docs/schedule.json', '.docs/schedule.json']) {
+  for (const c of require('../project-files').schedule) {
     const p = path.join(ROOT, c);
     if (fs.existsSync(p)) {
       try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }

@@ -26,7 +26,7 @@ The split is deliberate: ROADMAP is for reading ("what's the v0.5 story?"), sche
       "milestone": "2026-08-15",
       "items": [
         {
-          "id": "0.1.1",
+          "id": "v0.1.1",
           "title": "player movement",
           "estimate": 3,
           "start": "2026-08-01",
@@ -44,8 +44,8 @@ The split is deliberate: ROADMAP is for reading ("what's the v0.5 story?"), sche
 Field notes:
 - `version.status`: `planned` / `in-progress` / `shipped` / `paused`
 - `item.status`: `todo` / `doing` / `done` / `blocked` / `dropped`
-- `estimate`: integer days. A wild guess is still useful — `0.1.1` taking 3 days vs 30 days changes the plan entirely
-- `dependsOn`: list of sibling item ids in the same version. The Gantt wires them with arrows; `check` catches dangling refs
+- `estimate`: integer days. A wild guess is still useful — `v0.1.1` taking 3 days vs 30 days changes the plan entirely
+- `dependsOn`: list of sibling item ids in the same version. The Gantt detail card lists dependencies. `check` catches dangling references
 - `confidence`: `high` / `low`. The Gantt renders `low` bars with a dashed outline so the human sees the uncertainty at a glance
 - `milestone`: the version's target ship date. Slipping it is honest — update the date, let the Gantt re-render, never let the schedule lie about reality
 
@@ -53,13 +53,14 @@ Field notes:
 
 ```bash
 node schedule.js init                                       # create an empty schedule.json
+# Add v0.1 to versions using the JSON format above, starting with an empty items array.
 node schedule.js add "player movement" --version v0.1 --estimate 3 --start 2026-08-01 --due 2026-08-04
-node schedule.js add "camera follow" --version v0.1 --estimate 2 --depends 0.1.1 --confidence low
+node schedule.js add "camera follow" --version v0.1 --estimate 2 --depends v0.1.1 --confidence low
 node schedule.js list --version v0.1
-node schedule.js bump 0.1.1 --status doing
-node schedule.js edit 0.1.1 --estimate 5                    # reality changed — update the estimate
-node schedule.js done 0.1.1
-node schedule.js drop 0.1.3                                 # withdrew this item, reason kept in the title
+node schedule.js bump v0.1.1 --status doing
+node schedule.js edit v0.1.1 --estimate 5                    # reality changed — update the estimate
+node schedule.js done v0.1.1
+node schedule.js drop v0.1.2                                 # withdrew this item, reason kept in the title
 ```
 
 Item ids are auto-assigned per version (`<version-id>.<n>`), so `add` doesn't need you to invent one.
@@ -69,7 +70,7 @@ Item ids are auto-assigned per version (`<version-id>.<n>`), so `add` doesn't ne
 `keeper site serve` renders the schedule as an interactive Gantt inside the ROADMAP page (not a separate view that covers the whole screen — a same-page expandable section):
 
 - **Task bars** clickable → detail card with a jump link to the sprint doc
-- **Dependencies** drawn as arrows between bars
+- **Dependencies** listed in the task detail card
 - **Confidence**: `low` bars get a dashed outline so uncertain estimates are visible at a glance
 - **Zoom controls**: +/- / reset / full-width
 - **`keeper schedule gantt --out schedule.svg`** exports a standalone SVG for sharing offline

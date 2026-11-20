@@ -56,11 +56,11 @@ indie-keeper 就是冲这些来的。
 
 AI 会先问诊再动工，绝不套死模板。
 
-**当 CLI 用**：把 `scripts/` 拷进你的项目（建议 `tools/keeper/`），package.json 注册一行 `"keeper": "node tools/keeper/keeper.js"`。日常使用前仍需先过一轮问诊——让 AI 来（推荐），或照着问诊手册自己填。人类敲法完整手册：[references/cli.md](../../references/cli.md)。
+**当 CLI 用**：把 `scripts/` 拷进你的项目（建议 `tools/keeper/`），package.json 注册一行 `"keeper": "node tools/keeper/keeper.js"`。日常使用前仍需先过一轮问诊——让 AI 来（推荐），或照着问诊手册自己填。人类敲法完整手册：[中文 CLI 手册](../../references/cli.zh.md)。
 
 不管走哪条路，首次使用都是**问诊**，不是安装向导：AI 先问清你的分工、平台、习惯（每题带建议和推荐值），答案存进 `keeper-profile.json`，之后所有房间按你的习惯办事。分工表里标了权威归属的领域（比如"世界观归你拍板"），AI 只组织和实现，**不自由发挥**。已有文档结构的老项目走"旧房改造"：先盘点登记，不推倒重来。
 
-问诊完后裸敲 `keeper`，它就上班了——旁边是它照看的房子，名字用的是**你游戏自己的名字**：
+问诊后在终端输入 `keeper`，就能看到你的游戏名和接班时用得到的命令。
 
 ![keeper 开屏](../../assets/cli-menu.svg)
 
@@ -144,16 +144,16 @@ indie-keeper 本身就是用 indie-keeper 管的——这套文档的中英双�
 
 ## 安全承诺
 
-治理文档的前提是不弄坏文档。[SKILL.md](SKILL.md) 写死了六条红线：永不删除原始文件、归档代替删除、破坏性操作逐项授权、修改走最小切口、绝不递归删除、动手前保证可回退。**红线优先于任何配置，AI 不得以任何理由违反。**
+治理文档的前提是不弄坏文档。[中文 Skill 手册](SKILL.zh.md) 写死了六条红线：永不删除原始文件、归档代替删除、破坏性操作逐项授权、修改走最小切口、绝不递归删除、动手前保证可回退。**红线优先于任何配置，AI 不得以任何理由违反。**
 
 ## 仓库结构
 
 | 目录 | 内容 |
 |------|------|
-| [SKILL.md](SKILL.md) | 总纲：AI 上岗流程、房间速览、安全红线、行为守则 |
-| [references/](references/) | 各房间机制手册 + 问诊手册 + CLI 人类手册 + 游戏文档推荐菜单 |
-| [scripts/](scripts/) | 零依赖 Node 参考实现——`keeper.js` 入口 + `commands/`（一文件一房间）+ `lib/`（共享库） |
-| [templates/](templates/) | 数据文件模板 + 游戏设计文档骨架 + UIUX-SPEC 模板 |
+| [中文 Skill 手册](SKILL.zh.md) | 总纲：AI 上岗流程、房间速览、安全红线、行为守则 |
+| [references/](../../references/) | 各房间机制手册 + 问诊手册 + CLI 人类手册 + 游戏文档推荐菜单 |
+| [scripts/](../../scripts/) | 零依赖 Node 参考实现——`keeper.js` 入口 + `commands/`（房间命令）、`lang.js`（界面语言）和 `project-files.js`（登记表路径） |
+| [templates/](../../templates/) | 数据文件模板 + 游戏设计文档骨架 + UIUX-SPEC 模板 |
 | [docs/](../../docs/) | 文档 i18n manifest + 翻译指纹 + 根文档中文版（`docs/zh/`） |
 
 > 作者自己的工作文档（ROADMAP / PLAN / PROGRESS / sprints / decisions——也就是本 Skill 给你项目播下的那套骨架）活在内部工作分支上，故意不进公开仓。吃自己的狗粮也包括“内部文档就该待在内部”这条。
@@ -166,4 +166,4 @@ indie-keeper 本身就是用 indie-keeper 管的——这套文档的中英双�
 
 ## License
 
-[MIT](LICENSE) · 拿去用，改成你自己的管家也行。
+[MIT](../../LICENSE) · 拿去用，改成你自己的管家也行。

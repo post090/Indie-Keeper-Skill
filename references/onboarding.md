@@ -243,7 +243,7 @@ project-root/
 └── scripts/             ← keeper CLI + room scripts
     ├── keeper.js        ← CLI entry
     ├── lang.js          ← shared i18n helper
-    ├── lib/             ← shared library helpers
+    ├── project-files.js ← registry paths used by keeper.js and room commands
     ├── commands/        ← one file per room (truth/feedback/docs-site/…)
     └── tests/           ← test scripts (see Testing convention below)
 ```

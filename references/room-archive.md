@@ -36,7 +36,7 @@ node truth.js update ROADMAP.md --section "v0.5" --content "..."
 node truth.js update PROGRESS.md --section "log" --append --content "..."
 ```
 
-Splits by markdown headings (a `#` inside a code block does not count as a heading), touches only the target section, leaves everything else intact. When the section is not found, lists all section names to help you correct it.
+Splits by markdown headings (a `#` inside a code block does not count as a heading), touches only the target section, leaves everything else intact. A missing section prints the available headings. If several headings match, specify an exact heading and add `--parent "Parent heading"` to select its branch. An ambiguous edit exits before writing.
 
 ### Checkup (check)
 
